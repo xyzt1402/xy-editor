@@ -25,7 +25,7 @@ export type {
 } from './state/types';
 
 // Re-export state functions
-export { createEmptyState } from './state/createEmptyState';
+export { createEmptyState, generateNodeId } from './state/createEmptyState';
 export { applyTransaction } from './state/applyTransaction';
 
 // Re-export transform functions

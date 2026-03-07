@@ -4,15 +4,20 @@
  * @module state/createEmptyState
  */
 
+import { nanoid } from 'nanoid';
 import type { EditorState } from './types';
 
 /**
  * Generates a unique ID for nodes.
- * Uses a simple counter-based approach for consistency.
+ * Uses a nanoid for better uniqueness and performance compared to a simple counter.
+ * @returns A unique string ID
+ * @example
+ * const id1 = generateNodeId(); // e.g. 'V1StGXR8_Z5jdHi6B-myT'
+ * const id2 = generateNodeId(); // e.g. 'mJ9s8fX9a2b3c4d5e6f7g'
+ * console.log(id1 !== id2); // true
  */
-let nodeIdCounter = 0;
-function generateNodeId(): string {
-    return `node_${++nodeIdCounter}_${Date.now()}`;
+export function generateNodeId(): string {
+    return nanoid();
 }
 
 /**
