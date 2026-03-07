@@ -1,0 +1,38 @@
+{
+    "name": "@xy-editor/react",
+    "version": "0.0.1",
+    "description": "React components for xy-editor",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "test": "vitest",
+        "lint": "eslint src --ext .ts,.tsx"
+    },
+    "dependencies": {
+        "@xy-editor/core": "workspace:*",
+        "@xy-editor/ui-tokens": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.0",
+        "react": "^18.2.0",
+        "tsup": "^8.0.0",
+        "typescript": "^5.0.0",
+        "vitest": "^1.0.0"
+    },
+    "peerDependencies": {
+        "react": "^18.2.0"
+    }
+}
