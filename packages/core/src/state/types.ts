@@ -48,7 +48,7 @@ export interface EditorNode {
     /** Unique identifier for this node */
     id: string;
     /** The type of node (e.g., 'paragraph', 'heading', 'text') */
-    type: string;
+    type: NodeType;
     /** Child nodes (for container nodes) */
     children?: EditorNode[];
     /** Text content (for text nodes) */
@@ -139,9 +139,17 @@ export interface EditorState {
  * Represents a single transformation to apply to the document.
  * A transaction is a collection of one or more steps.
  */
+
+export type TransformStepType =
+    | 'addMark'
+    | 'removeMark'
+    | 'setNode'
+    | 'insertNode'
+    | 'deleteNode';
+
 export interface TransformStep {
     /** The type of transform (e.g., 'addMark', 'removeMark', 'insert', 'delete') */
-    type: string;
+    type: TransformStepType;
     /** Position or range to apply the transform */
     position?: {
         anchor?: { nodeId: string; offset: number };

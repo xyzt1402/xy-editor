@@ -25,8 +25,10 @@ export type {
 } from './state/types';
 
 // Re-export state functions
-export { createEmptyState, generateNodeId } from './state/createEmptyState';
+export { createEmptyState } from './state/createEmptyState';
 export { applyTransaction } from './state/applyTransaction';
+
+export { generateId } from './utils/generateId';
 
 // Re-export transform functions
 export { addMark, removeMark, toggleMark } from './transforms/marks';

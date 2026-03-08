@@ -4,199 +4,200 @@
  * @module plugins/PluginRegistry
  */
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 /**
  * Interface representing an editor plugin.
+ *
+ * Use the generic TConfig parameter to type plugin-specific configuration
+ * instead of using an index signature, which would disable TypeScript's
+ * property checking.
+ *
+ * @example
+ * ```typescript
+ * interface LinkPluginConfig { defaultTarget?: '_blank' | '_self' }
+ * const linkPlugin: EditorPlugin<LinkPluginConfig> = {
+ *   name: 'link',
+ *   config: { defaultTarget: '_blank' },
+ * };
+ * ```
  */
-export interface EditorPlugin {
-    /** Unique name of the plugin */
-    name: string;
-    /** Optional version string */
-    version?: string;
-    /** Optional initialization function called when plugin is registered */
+export interface EditorPlugin<TConfig = unknown> {
+    /** Unique name — used as the registry key. Must be non-empty. */
+    readonly name: string;
+    /** Semver version string for debugging and compatibility checks */
+    readonly version?: string;
+    /**
+     * Called when the plugin is registered.
+     * If async, the registry awaits completion before marking plugin as ready.
+     */
     init?: () => void | Promise<void>;
-    /** Optional cleanup function called when plugin is unregistered */
+    /**
+     * Called when the plugin is unregistered or the registry is cleared.
+     * If async, the registry awaits completion before removing the plugin.
+     */
     destroy?: () => void | Promise<void>;
-    /** Additional plugin-specific configuration */
-    [key: string]: unknown;
+    /** Typed plugin-specific configuration */
+    readonly config?: TConfig;
 }
 
 /**
+ * Metadata stored internally alongside each plugin.
+ */
+interface PluginEntry {
+    plugin: Readonly<EditorPlugin>;
+    /** Insertion index — preserved for ordered iteration */
+    order: number;
+    /** Unix timestamp when the plugin was registered */
+    registeredAt: number;
+}
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+/**
  * Registry for managing editor plugins.
- * 
- * Provides methods to register, retrieve, and manage plugins.
- * 
+ *
+ * All mutating operations (register, unregister, clear) are async to allow
+ * plugins to perform async initialization and cleanup.
+ *
  * @example
  * ```typescript
  * const registry = new PluginRegistry();
- * 
- * registry.register({
- *   name: 'myPlugin',
- *   version: '1.0.0',
- *   init: () => { console.log('Plugin initialized'); }
- * });
- * 
- * const plugins = registry.getAll();
- * const plugin = registry.getByName('myPlugin');
+ * await registry.register({ name: 'bold', init: async () => { ... } });
+ * const plugin = registry.getByName('bold');
  * ```
  */
 export class PluginRegistry {
-    /**
-     * Internal storage for registered plugins.
-     */
-    private plugins: Map<string, EditorPlugin> = new Map();
+    private readonly entries: Map<string, PluginEntry> = new Map();
+    private orderCounter = 0;
+
+    // ─── Write Operations ─────────────────────────────────────────────────────
 
     /**
-     * Registers a plugin with the registry.
-     * 
-     * @param plugin - The plugin to register
-     * @throws Error if a plugin with the same name is already registered
-     * 
-     * @example
-     * ```typescript
-     * registry.register({
-     *   name: 'bold',
-     *   init: () => { /* setup *\/ }
-     * });
-     * ```
+     * Registers a plugin and awaits its initialization.
+     *
+     * @throws {Error} If the plugin name is empty or whitespace
+     * @throws {Error} If a plugin with the same name is already registered
+     * @throws {Error} If the plugin's init() throws or rejects
      */
-    register(plugin: EditorPlugin): void {
-        if (!plugin.name) {
-            throw new Error('Plugin must have a name');
+    async register(plugin: EditorPlugin): Promise<void> {
+        const name = plugin.name?.trim();
+
+        if (!name) {
+            throw new Error(
+                `[PluginRegistry] Plugin name cannot be empty or whitespace.`
+            );
         }
 
-        if (this.plugins.has(plugin.name)) {
-            throw new Error(`Plugin with name '${plugin.name}' is already registered`);
+        if (this.entries.has(name)) {
+            throw new Error(
+                `[PluginRegistry] Plugin '${name}' is already registered. ` +
+                `Call unregister('${name}') first if you intend to replace it.`
+            );
         }
 
-        // Call the plugin's init function if provided
+        // Await init before storing — plugin is not available until ready
         if (plugin.init) {
-            const result = plugin.init();
-            // Handle async initialization
-            if (result instanceof Promise) {
-                result.catch((error) => {
-                    console.error(`Failed to initialize plugin '${plugin.name}':`, error);
-                });
-            }
+            await plugin.init();
         }
 
-        this.plugins.set(plugin.name, plugin);
+        this.entries.set(name, {
+            plugin: Object.freeze({ ...plugin }), // freeze to prevent external mutation
+            order: this.orderCounter++,
+            registeredAt: Date.now(),
+        });
     }
 
     /**
-     * Retrieves all registered plugins.
-     * 
-     * @returns An array of all registered plugins
-     * 
-     * @example
-     * ```typescript
-     * const allPlugins = registry.getAll();
-     * ```
+     * Unregisters a plugin by name, awaiting its cleanup.
+     *
+     * @throws {Error} If no plugin with the given name is registered
      */
-    getAll(): EditorPlugin[] {
-        return Array.from(this.plugins.values());
-    }
+    async unregister(name: string): Promise<void> {
+        const entry = this.entries.get(name);
 
-    /**
-     * Retrieves a plugin by its name.
-     * 
-     * @param name - The name of the plugin to retrieve
-     * @returns The plugin if found, undefined otherwise
-     * 
-     * @example
-     * ```typescript
-     * const plugin = registry.getByName('bold');
-     * if (plugin) {
-     *   // Use the plugin
-     * }
-     * ```
-     */
-    getByName(name: string): EditorPlugin | undefined {
-        return this.plugins.get(name);
-    }
-
-    /**
-     * Unregisters a plugin by its name.
-     * 
-     * @param name - The name of the plugin to unregister
-     * @returns true if the plugin was found and removed, false otherwise
-     * 
-     * @example
-     * ```typescript
-     * const removed = registry.unregister('bold');
-     * ```
-     */
-    unregister(name: string): boolean {
-        const plugin = this.plugins.get(name);
-
-        if (!plugin) {
-            return false;
+        if (!entry) {
+            throw new Error(
+                `[PluginRegistry] Cannot unregister '${name}' — no plugin with that name is registered.`
+            );
         }
 
-        // Call the plugin's destroy function if provided
-        if (plugin.destroy) {
-            const result = plugin.destroy();
-            // Handle async cleanup
-            if (result instanceof Promise) {
-                result.catch((error) => {
-                    console.error(`Failed to destroy plugin '${name}':`, error);
-                });
-            }
+        // Await destroy before removing — ensures cleanup completes first
+        if (entry.plugin.destroy) {
+            await entry.plugin.destroy();
         }
 
-        return this.plugins.delete(name);
+        this.entries.delete(name);
     }
 
     /**
-     * Checks if a plugin with the given name is registered.
-     * 
-     * @param name - The name of the plugin to check
-     * @returns true if the plugin is registered, false otherwise
-     * 
-     * @example
-     * ```typescript
-     * if (registry.has('bold')) {
-     *   // Plugin exists
-     * }
-     * ```
+     * Unregisters all plugins in reverse registration order.
+     * Reverse order ensures plugins that depend on others are torn down first.
+     *
+     * Errors during individual plugin destroy are collected and rethrown
+     * together after all plugins have been processed, so one failing plugin
+     * does not prevent others from cleaning up.
      */
-    has(name: string): boolean {
-        return this.plugins.has(name);
-    }
+    async clear(): Promise<void> {
+        // Reverse registration order for teardown
+        const allEntries = Array.from(this.entries.values())
+            .sort((a, b) => b.order - a.order);
 
-    /**
-     * Clears all registered plugins.
-     * 
-     * @example
-     * ```typescript
-     * registry.clear();
-     * ```
-     */
-    clear(): void {
-        // Call destroy on all plugins before clearing
-        for (const plugin of this.plugins.values()) {
-            if (plugin.destroy) {
-                const result = plugin.destroy();
-                if (result instanceof Promise) {
-                    result.catch((error) => {
-                        console.error(`Failed to destroy plugin '${plugin.name}':`, error);
-                    });
+        const errors: Array<{ name: string; error: unknown }> = [];
+
+        for (const entry of allEntries) {
+            if (entry.plugin.destroy) {
+                try {
+                    await entry.plugin.destroy();
+                } catch (error) {
+                    errors.push({ name: entry.plugin.name, error });
                 }
             }
+            this.entries.delete(entry.plugin.name);
         }
-        this.plugins.clear();
+
+        if (errors.length > 0) {
+            const summary = errors
+                .map(({ name, error }) =>
+                    `  - '${name}': ${error instanceof Error ? error.message : String(error)}`
+                )
+                .join('\n');
+            throw new Error(
+                `[PluginRegistry] ${errors.length} plugin(s) failed during clear:\n${summary}`
+            );
+        }
+    }
+
+    // ─── Read Operations ──────────────────────────────────────────────────────
+
+    /**
+     * Returns all registered plugins in registration order.
+     * Returns frozen copies — plugins cannot be mutated via this array.
+     */
+    getAll(): ReadonlyArray<Readonly<EditorPlugin>> {
+        return Array.from(this.entries.values())
+            .sort((a, b) => a.order - b.order)
+            .map((entry) => entry.plugin);
+    }
+
+    /**
+     * Returns a plugin by name, or undefined if not registered.
+     */
+    getByName(name: string): Readonly<EditorPlugin> | undefined {
+        return this.entries.get(name)?.plugin;
+    }
+
+    /**
+     * Returns whether a plugin with the given name is registered.
+     */
+    has(name: string): boolean {
+        return this.entries.has(name);
     }
 
     /**
      * Returns the number of registered plugins.
-     * 
-     * @returns The count of registered plugins
-     * 
-     * @example
-     * ```typescript
-     * const count = registry.size;
-     * ```
      */
     get size(): number {
-        return this.plugins.size;
+        return this.entries.size;
     }
 }
