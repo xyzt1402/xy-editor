@@ -143,12 +143,17 @@ export class PdfParser implements Parser {
             const page = await pdf.getPage(pageNum);
             const pageBlocks = await extractPageText(page);
 
-            // Add horizontal rule between pages
-            if (allBlocks.length > 0 && pageBlocks.length > 0) {
-                allBlocks.push({ type: 'hr', text: '' });
-            }
+            // Group text items into lines based on Y position
+            const lines = groupIntoLines(
+                textContent.items as PdfjsTextItem[]
+            );
 
-            allBlocks.push(...pageBlocks);
+            for (const line of lines) {
+                const text = line.text.trim();
+                if (!text) continue;
+
+                const block = classifyLine(line);
+                blocks.push(block);
         }
 
         const meta: FileMeta = {
