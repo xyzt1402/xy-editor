@@ -1,142 +1,140 @@
 /**
- * CSV parser.
+ * CSV / TSV parser.
  * @package @xy-editor/file-ingestion
  * @module parsers/csv
  */
 
-import type { Parser, RawContent, RawBlock, FileMeta } from '../types';
+import type { Parser, RawContent, RawBlock } from '../types';
+import { buildFileMeta, validateFile } from '../utils';
 
-/**
- * Simple CSV parser that handles quoted fields and commas.
- */
-function parseCSV(text: string): string[][] {
-    const rows: string[][] = [];
-    let currentRow: string[] = [];
-    let currentField = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const nextChar = text[i + 1];
-
-        if (inQuotes) {
-            if (char === '"' && nextChar === '"') {
-                // Escaped quote
-                currentField += '"';
-                i++; // Skip next quote
-            } else if (char === '"') {
-                // End of quoted field
-                inQuotes = false;
-            } else {
-                currentField += char;
-            }
-        } else {
-            if (char === '"') {
-                // Start of quoted field
-                inQuotes = true;
-            } else if (char === ',') {
-                // End of field
-                currentRow.push(currentField.trim());
-                currentField = '';
-            } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
-                // End of row
-                currentRow.push(currentField.trim());
-                if (currentRow.some(f => f)) {
-                    rows.push(currentRow);
-                }
-                currentRow = [];
-                currentField = '';
-                if (char === '\r') i++; // Skip \n
-            } else if (char !== '\r') {
-                currentField += char;
-            }
-        }
-    }
-
-    // Add last field and row
-    currentRow.push(currentField.trim());
-    if (currentRow.some(f => f)) {
-        rows.push(currentRow);
-    }
-
-    return rows;
-}
-
-/**
- * CSV Parser implementation.
- * Converts CSV rows into table RawBlocks.
- */
 export class CsvParser implements Parser {
-    mimeTypes = ['text/csv', 'application/csv'];
+    mimeTypes = [
+        'text/csv',
+        'text/tab-separated-values',
+        'application/csv',
+        'application/vnd.ms-excel', // some browsers report .csv with this MIME
+    ];
     extensions = ['csv', 'tsv'];
 
-    /**
-     * Parses a CSV file and returns raw content.
-     * @param file - The CSV file to parse
-     * @returns Promise resolving to raw content
-     */
     async parse(file: File): Promise<RawContent> {
+        validateFile(file);
+
         const text = await file.text();
+        const delimiter = file.name.endsWith('.tsv') || file.type === 'text/tab-separated-values'
+            ? '\t'
+            : detectDelimiter(text);
 
-        const rows = parseCSV(text);
-        const blocks: RawBlock[] = [];
-
-        if (rows.length === 0) {
-            const meta: FileMeta = {
-                filename: file.name,
-                mimeType: file.type || 'text/csv',
-                size: file.size,
-                lastModified: file.lastModified,
-                extension: 'csv',
-            };
-
-            return { blocks: [], meta };
-        }
-
-        // First row is header
-        const headerRow = rows[0];
-
-        // Create a heading from the header
-        if (headerRow && headerRow.length > 0) {
-            blocks.push({
-                type: 'heading',
-                level: 1,
-                text: headerRow.join(' | '),
-                data: { isHeader: true },
-            });
-        }
-
-        // Process remaining rows as table rows
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-
-            // Pad row to match header length
-            while (headerRow && row.length < headerRow.length) {
-                row.push('');
-            }
-
-            blocks.push({
-                type: 'table-row',
-                text: row.join(' | '),
-                data: { cells: row },
-            });
-        }
-
-        const meta: FileMeta = {
-            filename: file.name,
-            mimeType: file.type || 'text/csv',
-            size: file.size,
-            lastModified: file.lastModified,
-            extension: 'csv',
-        };
+        const rows = parseDelimited(text, delimiter);
+        const blocks: RawBlock[] = rows.map((cells, index) => ({
+            type: 'table-row',
+            text: cells.join('\t'),
+            data: {
+                cells,
+                isHeader: index === 0,
+                delimiter,
+            },
+        }));
 
         return {
             blocks,
-            meta,
+            meta: buildFileMeta(file, 'text/csv'),
         };
     }
 }
 
-// Export singleton instance for convenience
+// ─── Delimiter Detection ──────────────────────────────────────────────────────
+
+/**
+ * Sniffs the most likely delimiter by counting occurrences in the first line.
+ */
+function detectDelimiter(text: string): string {
+    const firstLine = text.split('\n')[0] ?? '';
+    const candidates = [',', ';', '\t', '|'];
+    let best = ',';
+    let bestCount = 0;
+
+    for (const c of candidates) {
+        const count = firstLine.split(c).length - 1;
+        if (count > bestCount) {
+            bestCount = count;
+            best = c;
+        }
+    }
+
+    return best;
+}
+
+// ─── RFC 4180-compliant Parser ────────────────────────────────────────────────
+
+/**
+ * Parses delimited text respecting quoted fields and escaped quotes.
+ * Handles: commas inside quotes, newlines inside quotes, "" as escaped quote.
+ */
+function parseDelimited(text: string, delimiter: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < text.length) {
+        const char = text[i]!;
+        const next = text[i + 1];
+
+        if (inQuotes) {
+            if (char === '"' && next === '"') {
+                // Escaped quote inside quoted field
+                field += '"';
+                i += 2;
+                continue;
+            }
+            if (char === '"') {
+                inQuotes = false;
+                i++;
+                continue;
+            }
+            field += char;
+        } else {
+            if (char === '"') {
+                inQuotes = true;
+                i++;
+                continue;
+            }
+            if (char === delimiter) {
+                row.push(field.trim());
+                field = '';
+                i++;
+                continue;
+            }
+            if (char === '\r' && next === '\n') {
+                row.push(field.trim());
+                rows.push(row);
+                row = [];
+                field = '';
+                i += 2;
+                continue;
+            }
+            if (char === '\n') {
+                row.push(field.trim());
+                rows.push(row);
+                row = [];
+                field = '';
+                i++;
+                continue;
+            }
+            field += char;
+        }
+        i++;
+    }
+
+    // Push last field and row
+    if (field || row.length > 0) {
+        row.push(field.trim());
+        rows.push(row);
+    }
+
+    // Filter out completely empty rows
+    return rows.filter(r => r.some(cell => cell.length > 0));
+}
+
 export const csvParser = new CsvParser();

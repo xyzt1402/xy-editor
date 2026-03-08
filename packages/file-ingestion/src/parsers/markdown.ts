@@ -1,137 +1,107 @@
 /**
- * Markdown parser using marked.
+ * Markdown parser using marked (lazy loaded).
  * @package @xy-editor/file-ingestion
  * @module parsers/markdown
  */
 
-import type { Parser, RawContent, RawBlock, FileMeta } from '../types';
+import type { Parser, RawContent, RawBlock } from '../types';
+import { buildFileMeta, validateFile } from '../utils';
+import type { Tokens, TokensList } from 'marked';
 
-/**
- * Converts marked tokens to RawBlocks.
- */
-function tokensToBlocks(tokens: Array<{
-    type: string;
-    text?: string;
-    depth?: number;
-    raw?: string;
-}>): RawBlock[] {
-    const blocks: RawBlock[] = [];
-
-    for (const token of tokens) {
-        switch (token.type) {
-            case 'heading':
-                blocks.push({
-                    type: 'heading',
-                    level: token.depth ?? 1,
-                    text: token.text ?? '',
-                });
-                break;
-
-            case 'paragraph':
-                blocks.push({
-                    type: 'paragraph',
-                    text: token.text ?? '',
-                });
-                break;
-
-            case 'list':
-                // Handle list items
-                const items = (token as any).items || [];
-                for (const item of items) {
-                    blocks.push({
-                        type: 'list-item',
-                        text: item.text ?? '',
-                    });
-                }
-                break;
-
-            case 'code':
-                blocks.push({
-                    type: 'code',
-                    text: token.text ?? '',
-                    data: { raw: token.raw },
-                });
-                break;
-
-            case 'hr':
-                blocks.push({
-                    type: 'hr',
-                    text: '',
-                });
-                break;
-
-            case 'table':
-                // Handle table rows
-                const rows = (token as any).rows || [];
-                for (const row of rows) {
-                    const cells = row.map((cell: any) => cell.text ?? '').join(' | ');
-                    blocks.push({
-                        type: 'table-row',
-                        text: cells,
-                    });
-                }
-                break;
-
-            case 'blockquote':
-                // Convert blockquote to paragraph with indentation hint
-                blocks.push({
-                    type: 'paragraph',
-                    text: token.text ?? '',
-                });
-                break;
-
-            default:
-                // Skip unknown tokens
-                break;
-        }
-    }
-
-    return blocks;
-}
-
-/**
- * Markdown Parser implementation.
- * Parses Markdown files using marked.lexer().
- */
 export class MarkdownParser implements Parser {
-    mimeTypes = [
-        'text/markdown',
-        'text/x-markdown',
-        'application/json', // Sometimes used for MD files
-    ];
-    extensions = ['md', 'markdown', 'mdown', 'mkd'];
+    mimeTypes = ['text/markdown', 'text/x-markdown'];
+    extensions = ['md', 'mdx', 'markdown'];
 
-    /**
-     * Parses a Markdown file and returns raw content.
-     * @param file - The Markdown file to parse
-     * @returns Promise resolving to raw content
-     */
     async parse(file: File): Promise<RawContent> {
+        validateFile(file);
+
         const text = await file.text();
 
-        // Dynamically import marked
-        const marked = await import('marked');
+        // Lazy load marked — only loaded when a markdown file is opened
+        const { marked, Lexer } = await import('marked');
 
-        // Use lexer to get token stream
-        const tokens = marked.lexer(text);
+        const tokens: TokensList = Lexer.lex(text);
+        const blocks: RawBlock[] = [];
 
-        // Convert tokens to blocks
-        const blocks = tokensToBlocks(tokens);
 
-        const meta: FileMeta = {
-            filename: file.name,
-            mimeType: file.type || 'text/markdown',
-            size: file.size,
-            lastModified: file.lastModified,
-            extension: 'md',
-        };
+        for (const token of tokens) {
+            switch (token.type) {
+                case 'heading':
+                    blocks.push({
+                        type: 'heading',
+                        level: token.depth,
+                        text: token.text,
+                    });
+                    break;
+
+                case 'paragraph':
+                    blocks.push({ type: 'paragraph', text: token.text });
+                    break;
+
+                case 'list':
+                    for (const item of token.items) {
+                        blocks.push({ type: 'list-item', text: item.text });
+                    }
+                    break;
+
+                case 'code':
+                    blocks.push({
+                        type: 'code',
+                        text: token.text,
+                        data: { lang: token.lang ?? '' },
+                    });
+                    break;
+
+                case 'blockquote':
+                    blocks.push({ type: 'blockquote', text: token.text });
+                    break;
+
+                case 'hr':
+                    blocks.push({ type: 'hr', text: '' });
+                    break;
+
+                case 'table': {
+                    // Cast to Tokens.Table — TypeScript can't narrow this automatically
+                    const t = token as Tokens.Table;
+
+                    const headerCells = t.header.map((h: Tokens.TableCell) => h.text);
+                    blocks.push({
+                        type: 'table-row',
+                        text: headerCells.join('\t'),
+                        data: { cells: headerCells, isHeader: true },
+                    });
+
+                    for (const row of t.rows) {
+                        const cells = row.map((cell: Tokens.TableCell) => cell.text);
+                        blocks.push({
+                            type: 'table-row',
+                            text: cells.join('\t'),
+                            data: { cells },
+                        });
+                    }
+                    break;
+                }
+
+                case 'space':
+                    // Skip blank lines between blocks
+                    break;
+
+                default:
+                    // Render unknown tokens to HTML as fallback
+                    if ('raw' in token && token.raw.trim()) {
+                        const html = await marked(token.raw);
+                        if (html.trim()) {
+                            blocks.push({ type: 'paragraph', text: token.raw.trim() });
+                        }
+                    }
+            }
+        }
 
         return {
             blocks,
-            meta,
+            meta: buildFileMeta(file, 'text/markdown'),
         };
     }
 }
 
-// Export singleton instance for convenience
 export const markdownParser = new MarkdownParser();
