@@ -11,40 +11,42 @@ import type { EditorState, EditorNode } from './types';
  * Creates a new empty editor state.
  *
  * Document structure:
- * doc
- * └── paragraph
- *     └── text ("")
+ *   doc
+ *   └── paragraph
+ *       └── text ("")
  *
- * - No selection (null)
- * - Empty history stack
- * - meta.createdAt timestamp
- *
- * @returns A new EditorState with a single empty paragraph
+ * - selection: null
+ * - history: empty past and future stacks
+ * - meta.createdAt: current timestamp
+ * 
+ *  @returns A new EditorState with a single empty paragraph
  *
  * @example
  * ```typescript
  * const state = createEmptyState();
- * console.log(state.doc.children?.[0]?.type); // 'paragraph'
- * console.log(state.selection);               // null
- * console.log(state.history.past);            // []
+ * state.doc.type;                      // 'doc'
+ * state.doc.children?.[0]?.type;       // 'paragraph'
+ * state.doc.children?.[0]?.children?.[0]?.type; // 'text'
+ * state.selection;                     // null
+ * state.history.past;                  // []
  * ```
  */
 export function createEmptyState(): EditorState {
-    // Leaf text node — the actual editable content
+    // Leaf — the actual editable content unit
     const textNode: EditorNode = {
         id: generateId(),
         type: 'text',
         text: '',
     };
 
-    // Block container — holds text nodes as children
+    // Block container — holds one or more text leaf nodes
     const paragraphNode: EditorNode = {
         id: generateId(),
         type: 'paragraph',
         children: [textNode],
     };
 
-    // Root document node — always type 'doc', never has text
+    // Document root — always type 'doc', never has text or marks
     const docNode: EditorNode = {
         id: generateId(),
         type: 'doc',

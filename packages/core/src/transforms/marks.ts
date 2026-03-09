@@ -1,18 +1,21 @@
 /**
- * Transform functions for manipulating marks (inline formatting).
+ * Transform functions for inline mark operations.
  * @package @xy-editor/core
  * @module transforms/marks
  */
 
-import type { EditorState, Transaction, Mark, MarkType, TransformStep, EditorNode } from '../state/types';
+import type {
+    EditorState,
+    Transaction,
+    Mark,
+    MarkType,
+    TransformStep,
+    EditorNode,
+} from '../state/types';
 import { generateId } from '../utils/generateId';
 
-// ─── Internal Helpers ─────────────────────────────────────────────────────────
+// ─── Internal: Tree Traversal ─────────────────────────────────────────────────
 
-/**
- * Collects all text nodes between anchor and focus in document order.
- * Reuses the same traversal logic as applyTransaction.
- */
 function collectTextNodes(node: EditorNode, result: EditorNode[]): void {
     if (node.type === 'text') {
         result.push(node);
@@ -25,30 +28,29 @@ function collectTextNodes(node: EditorNode, result: EditorNode[]): void {
     }
 }
 
-/**
- * Checks whether ALL text nodes in the current selection have the given mark.
- *
- * Standard toggle behaviour:
- * - All nodes have mark → mark is "active" → toggle will remove it
- * - Any node is missing mark → mark is "inactive" → toggle will add it
- *
- * This ensures that selecting mixed content (some bold, some not) and pressing
- * Cmd+B makes everything bold first, then a second press removes it.
- *
- * For a collapsed selection (caret), checks storedMarks instead of the tree.
- */
-function isMarkActive(state: EditorState, markType: MarkType): boolean {
-    const { selection, doc } = state;
+// ─── Internal: Mark Active Check ─────────────────────────────────────────────
 
+/**
+ * Returns true if the given mark is active across the entire selection.
+ *
+ * Rules:
+ * - Collapsed selection (caret): checks storedMarks
+ * - Range selection: returns true only if ALL text nodes in range have the mark
+ *   (partial coverage = inactive, so toggle will add to make it uniform)
+ */
+export function isMarkActiveInSelection(
+    state: EditorState,
+    markType: MarkType,
+): boolean {
+    const { selection, doc } = state;
     if (!selection) return false;
 
-    // Collapsed selection (caret) — check storedMarks
-    // storedMarks represent the marks that will be applied to the next typed character
+    // Collapsed — check storedMarks (marks for the next typed character)
     if (selection.isCollapsed) {
         return (state.storedMarks ?? []).some((m) => m.type === markType);
     }
 
-    // Range selection — check if ALL text nodes in range have the mark
+    // Range — ALL text nodes in range must have the mark
     const textNodes: EditorNode[] = [];
     collectTextNodes(doc, textNodes);
 
@@ -61,27 +63,27 @@ function isMarkActive(state: EditorState, markType: MarkType): boolean {
     const start = Math.min(anchorIdx, focusIdx);
     const end = Math.max(anchorIdx, focusIdx);
 
-    // Every node in range must have the mark for it to be considered active
     for (let i = start; i <= end; i++) {
-        const node = textNodes[i]!;
-        const hasMarkOnNode = (node.marks ?? []).some((m) => m.type === markType);
-        if (!hasMarkOnNode) return false;
+        const hasMark = (textNodes[i]!.marks ?? []).some((m) => m.type === markType);
+        if (!hasMark) return false;
     }
 
     return true;
 }
 
+// ─── Internal: Position Helper ────────────────────────────────────────────────
+
 /**
- * Extracts the position from the current selection.
- * Throws if no selection is active — callers should guard before calling mark transforms.
+ * Extracts the step position from the current selection.
+ * Throws if no selection is active — mark operations require a selection.
  */
-function requireSelectionPosition(
+function requirePosition(
     state: EditorState,
     operationName: string,
 ): NonNullable<TransformStep['position']> {
     if (!state.selection) {
         throw new Error(
-            `[${operationName}] Cannot apply mark transform without an active selection.`
+            `[${operationName}] Cannot apply mark transform without an active selection.`,
         );
     }
     return {
@@ -93,14 +95,14 @@ function requireSelectionPosition(
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Creates a Transaction that adds a mark to the current selection.
+ * Creates a transaction that adds a mark to the current selection.
  *
  * @throws If there is no active selection
  *
  * @example
  * ```typescript
- * const tr = addMark(state, 'bold');
- * const newState = applyTransaction(state, tr);
+ * dispatch(addMark(state, 'bold'));
+ * dispatch(addMark(state, 'link', { href: 'https://example.com' }));
  * ```
  */
 export function addMark(
@@ -108,11 +110,12 @@ export function addMark(
     markType: MarkType,
     attrs?: Record<string, unknown>,
 ): Transaction {
-    const position = requireSelectionPosition(state, 'addMark');
 
-    // Only include attrs if they were actually provided
+    const position = requirePosition(state, 'addMark');
+
     const mark: Mark = {
         type: markType,
+        // Only include attrs when provided — avoids { attrs: undefined } on the object
         ...(attrs !== undefined && { attrs }),
     };
 
@@ -130,22 +133,21 @@ export function addMark(
 }
 
 /**
- * Creates a Transaction that removes a mark from the current selection.
- * Only the mark type is needed for removal — attrs are not matched.
+ * Creates a transaction that removes a mark from the current selection.
+ * Removal matches by mark type only — attrs are ignored.
  *
  * @throws If there is no active selection
  *
  * @example
  * ```typescript
- * const tr = removeMark(state, 'bold');
- * const newState = applyTransaction(state, tr);
+ * dispatch(removeMark(state, 'bold'));
  * ```
  */
 export function removeMark(
     state: EditorState,
     markType: MarkType,
 ): Transaction {
-    const position = requireSelectionPosition(state, 'removeMark');
+    const position = requirePosition(state, 'removeMark');
 
     // attrs intentionally omitted — removal matches by type only
     const mark: Mark = { type: markType };
@@ -164,20 +166,19 @@ export function removeMark(
 }
 
 /**
- * Creates a Transaction that toggles a mark on the current selection.
+ * Creates a transaction that toggles a mark on the current selection.
  *
- * Toggle behaviour:
+ * Toggle rules:
  * - ALL nodes in selection have mark → removes it
- * - ANY node in selection is missing mark → adds it to all
- *
- * For a collapsed selection, checks storedMarks instead of the document tree.
+ * - ANY node is missing mark → adds it to all (makes selection uniform)
+ * - Collapsed selection → checks storedMarks instead
  *
  * @throws If there is no active selection
  *
  * @example
  * ```typescript
- * const tr = toggleMark(state, 'bold');
- * const newState = applyTransaction(state, tr);
+ * dispatch(toggleMark(state, 'bold'));   // Cmd+B
+ * dispatch(toggleMark(state, 'italic')); // Cmd+I
  * ```
  */
 export function toggleMark(
@@ -185,19 +186,7 @@ export function toggleMark(
     markType: MarkType,
     attrs?: Record<string, unknown>,
 ): Transaction {
-    return isMarkActive(state, markType)
+    return isMarkActiveInSelection(state, markType)
         ? removeMark(state, markType)
         : addMark(state, markType, attrs);
 }
-
-/**
- * Returns whether a mark is currently active in the selection.
- * Useful for updating toolbar button pressed states.
- *
- * @example
- * ```typescript
- * const isBold = isMarkActiveInSelection(state, 'bold');
- * // Use to set toolbar button active state
- * ```
- */
-export { isMarkActive as isMarkActiveInSelection };

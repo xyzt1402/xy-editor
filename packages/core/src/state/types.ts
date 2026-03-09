@@ -4,31 +4,12 @@
  * @module state/types
  */
 
-/**
- * Represents a position in the document.
- * Uses 0-based indexing for both line and column.
- */
-export interface Position {
-    /** Line number (0-based) */
-    line: number;
-    /** Column offset within the line (0-based) */
-    column: number;
-}
+// ─── Marks ────────────────────────────────────────────────────────────────────
 
 /**
- * Represents a mark (inline formatting) that can be applied to text.
- * Examples: bold, italic, code, link, etc.
- */
-export interface Mark {
-    /** The type of mark (e.g., 'bold', 'italic', 'code', 'link') */
-    type: string;
-    /** Optional attributes for the mark (e.g., href for links) */
-    attrs?: Record<string, unknown>;
-}
-
-/**
- * Union type representing all possible mark types.
- * Extensible via string literal types for custom marks.
+ * All supported inline mark types.
+ * The trailing `& string` allows custom mark types while preserving
+ * autocomplete for the known values.
  */
 export type MarkType =
     | 'bold'
@@ -37,31 +18,27 @@ export type MarkType =
     | 'strikethrough'
     | 'code'
     | 'link'
+    | 'color'
     | 'highlight'
-    | string;
+    | 'fontFamily'
+    | 'fontSize'
+    | (string & Record<never, never>); // allows custom marks with autocomplete
 
 /**
- * Represents a node in the document tree.
- * Nodes can be block-level (paragraphs, headings, lists) or inline.
+ * An inline formatting mark applied to a text node.
  */
-export interface EditorNode {
-    /** Unique identifier for this node */
-    id: string;
-    /** The type of node (e.g., 'paragraph', 'heading', 'text') */
-    type: NodeType;
-    /** Child nodes (for container nodes) */
-    children?: EditorNode[];
-    /** Text content (for text nodes) */
-    text?: string;
-    /** Marks applied to this node or text */
-    marks?: Mark[];
-    /** Optional attributes for the node */
+export interface Mark {
+    type: MarkType;
+    /** Mark-specific attributes, e.g. { href } for links, { color } for color */
     attrs?: Record<string, unknown>;
 }
 
+// ─── Nodes ────────────────────────────────────────────────────────────────────
+
 /**
- * Union type representing all possible node types.
- * Extensible via string literal types for custom node types.
+ * All supported document node types.
+ * The trailing `& string` allows custom node types while preserving
+ * autocomplete for the known values.
  */
 export type NodeType =
     | 'doc'
@@ -74,104 +51,178 @@ export type NodeType =
     | 'blockquote'
     | 'codeBlock'
     | 'horizontalRule'
-    | string;
+    | 'table'
+    | 'tableRow'
+    | 'tableCell'
+    | 'hardBreak'
+    | (string & Record<never, never>);
 
 /**
- * Represents a selection in the document.
- * Can be a caret (collapsed selection) or a range.
+ * A node in the document tree.
+ *
+ * Nodes are either:
+ * - Container nodes: have `children`, no `text` (e.g. paragraph, heading, doc)
+ * - Leaf text nodes: have `text`, no `children` (type === 'text')
+ *
+ * These are mutually exclusive — a node should never have both.
  */
-export interface Selection {
-    /** ID of the anchor node */
-    anchor: {
-        nodeId: string;
-        offset: number;
-    };
-    /** ID of the head/focus node */
-    focus: {
-        nodeId: string;
-        offset: number;
-    };
-    /** Whether the selection is reversed (focus before anchor) */
-    reversed?: boolean;
-    /** Whether this is a caret (single position) */
-    isCollapsed?: boolean;
+export interface EditorNode {
+    /** Unique identifier — used for selection tracking and DOM reconciliation */
+    readonly id: string;
+    type: NodeType;
+    /** Child nodes — present on container nodes, absent on text leaves */
+    children?: EditorNode[];
+    /** Text content — present on type === 'text' nodes only */
+    text?: string;
+    /** Inline formatting marks — present on type === 'text' nodes only */
+    marks?: Mark[];
+    /** Block/node-level attributes, e.g. { level } for headings, { alignment } */
+    attrs?: Record<string, unknown>;
+}
+
+// ─── Selection ────────────────────────────────────────────────────────────────
+
+/**
+ * A point in the document, identified by node ID and character offset.
+ */
+export interface SelectionPoint {
+    /** ID of the EditorNode this point is in */
+    nodeId: string;
+    /** Character offset within the node's text content */
+    offset: number;
 }
 
 /**
- * Represents a single entry in the history stack.
- * Contains the state before a change was applied.
+ * A selection in the document.
+ * Can be a caret (collapsed) or a range.
+ */
+export interface Selection {
+    /** Start of the selection (always the earlier position in the document) */
+    anchor: SelectionPoint;
+    /** End of the selection (always the later position in the document) */
+    focus: SelectionPoint;
+    /** True if anchor === focus (cursor with no range) */
+    isCollapsed?: boolean;
+    /** True if the user dragged backwards (focus is before anchor in the doc) */
+    reversed?: boolean;
+}
+
+// ─── History ──────────────────────────────────────────────────────────────────
+
+/**
+ * A snapshot of editor state stored in the history stack.
+ * The nested history is stripped before storage to prevent
+ * exponential memory growth (history-within-history).
  */
 export interface HistoryEntry {
-    /** The state before the change */
+    /**
+     * The EditorState at this point in time.
+     * history.past and history.future are always empty inside a snapshot —
+     * the active stacks live only on the current state.
+     */
     state: EditorState;
-    /** Timestamp when this entry was created (Unix timestamp in ms) */
+    /** Unix timestamp (ms) when this entry was created */
     timestamp: number;
 }
 
 /**
- * Manages the undo/redo history stack.
+ * The undo/redo history stacks.
+ *
+ * Stack conventions:
+ * - `past`: LIFO — most recent undo entry is at the END (pop from end)
+ * - `future`: LIFO — most recent redo entry is at the FRONT (pop from front)
  */
 export interface HistoryStack {
-    /** Array of past states (for undo) */
     past: HistoryEntry[];
-    /** Array of future states (for redo) */
     future: HistoryEntry[];
 }
 
+// ─── Editor State ─────────────────────────────────────────────────────────────
+
 /**
- * The complete editor state.
- * This is an immutable snapshot of the document at a point in time.
+ * The complete, immutable editor state at a point in time.
+ * All mutations return a new EditorState — the original is never modified.
  */
 export interface EditorState {
-    /** The root document node */
+    /** Root document node (always type === 'doc') */
     doc: EditorNode;
-    /** Current selection (null if no selection) */
+    /** Current selection, or null if the editor is not focused */
     selection: Selection | null;
-    /** History stack for undo/redo */
+    /** Undo/redo history */
     history: HistoryStack;
-    /** Optional map of stored marks for the current input state */
+    /**
+     * Marks to apply to the next typed character.
+     * Set when the user toggles a mark with a collapsed selection (caret).
+     * Cleared after the next insertText operation.
+     */
     storedMarks?: Mark[];
-    /** Additional metadata */
+    /** Arbitrary metadata — last modified time, source file info, etc. */
     meta?: Record<string, unknown>;
 }
 
+// ─── Transactions & Steps ─────────────────────────────────────────────────────
+
 /**
- * Represents a single transformation to apply to the document.
- * A transaction is a collection of one or more steps.
+ * All valid transform step types.
+ * Every type must be handled in applyTransaction's switch statement.
  */
-
 export type TransformStepType =
-    | 'addMark'
-    | 'removeMark'
-    | 'setNode'
-    | 'insertNode'
-    | 'deleteNode';
+    | 'addMark'        // add a mark to text nodes in selection
+    | 'removeMark'     // remove a mark from text nodes in selection
+    | 'setNode'        // update attrs on a node
+    | 'insertText'     // insert plain text at the current selection
+    | 'insertNode'     // insert an EditorNode at the current selection
+    | 'deleteText'     // delete text within a range
+    | 'deleteNode'     // remove a node from the tree
+    | 'replaceDoc'     // replace the entire document (used by file ingestion)
+    | 'clearDoc'       // reset document to a single empty paragraph
+    | 'splitNode'      // split a node at the selection (e.g. Enter key)
+    | 'mergeNode';     // merge a node with the previous sibling (e.g. Backspace)
 
+/**
+ * A single atomic transformation step within a transaction.
+ */
 export interface TransformStep {
-    /** The type of transform (e.g., 'addMark', 'removeMark', 'insert', 'delete') */
     type: TransformStepType;
-    /** Position or range to apply the transform */
+    /**
+     * The document position(s) this step operates on.
+     * Both anchor and focus are optional — some steps (clearDoc, replaceDoc)
+     * don't require a position.
+     */
     position?: {
-        anchor?: { nodeId: string; offset: number };
-        focus?: { nodeId: string; offset: number };
+        anchor?: SelectionPoint;
+        focus?: SelectionPoint;
     };
-    /** The node to insert (for insert operations) */
+    /** The node to insert (insertNode) or the replacement doc (replaceDoc) */
     node?: EditorNode;
-    /** The mark to add or remove (for mark operations) */
+    /** The mark to add or remove (addMark, removeMark) */
     mark?: Mark;
-    /** Additional transform-specific data */
+    /** Step-specific data payload */
     data?: Record<string, unknown>;
 }
 
 /**
- * A Transaction represents a collection of transforms to apply atomically.
- * Each transaction can have multiple steps that are applied in order.
+ * A transaction groups one or more steps to be applied atomically.
+ * The entire transaction is pushed as one history entry.
  */
 export interface Transaction {
-    /** Unique identifier for this transaction */
+    /** Unique identifier — use generateId() from utils */
     id: string;
-    /** Array of steps to apply */
     steps: TransformStep[];
-    /** Optional metadata about the transaction */
+    /** Optional metadata for debugging and history labelling */
     meta?: Record<string, unknown>;
+}
+
+// ─── Plugins ──────────────────────────────────────────────────────────────────
+
+/**
+ * An editor plugin.
+ * Use the TConfig generic to type plugin-specific configuration.
+ */
+export interface EditorPlugin<TConfig = unknown> {
+    readonly name: string;
+    readonly version?: string;
+    init?: () => void | Promise<void>;
+    destroy?: () => void | Promise<void>;
+    readonly config?: TConfig;
 }
