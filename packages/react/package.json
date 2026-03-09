@@ -19,20 +19,31 @@
     "scripts": {
         "build": "tsup",
         "test": "vitest",
-        "lint": "eslint src --ext .ts,.tsx"
+        "test:ui": "vitest --ui",
+        "lint": "eslint src --ext .ts,.tsx",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@xy-editor/core": "workspace:*",
+        "@xy-editor/file-ingestion": "workspace:*",
         "@xy-editor/ui-tokens": "workspace:*"
     },
     "devDependencies": {
-        "@types/react": "^18.2.0",
-        "react": "^18.2.0",
-        "tsup": "^8.0.0",
-        "typescript": "^5.0.0",
-        "vitest": "^1.0.0"
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@testing-library/user-event": "^14.6.1",
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^5.1.4",
+        "jsdom": "^28.1.0",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
+        "tsup": "^8.5.1",
+        "typescript": "^5.9.3",
+        "vitest": "^4.0.18"
     },
     "peerDependencies": {
-        "react": "^18.2.0"
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
     }
 }
