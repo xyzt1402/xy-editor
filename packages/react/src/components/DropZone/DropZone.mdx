@@ -1,0 +1,86 @@
+{/* DropZone.stories.mdx — documentation page only.
+    Stories are defined in DropZone.stories.tsx and referenced via of={}.
+    This file must NOT contain inline JSX stories — Storybook 8+ requires
+    stories to live in .stories.tsx files. */}
+
+import { Meta, Controls, Canvas } from '@storybook/addon-docs/blocks';
+import * as DropZoneStories from './DropZone.stories';
+
+<Meta of={DropZoneStories} />
+
+# DropZone
+
+A drag-and-drop zone for file input. Fully keyboard accessible — pressing
+**Enter**, **Space**, or clicking the zone opens the native file dialog.
+
+## Props
+
+<Controls of={DropZoneStories.Default} />
+
+---
+
+## Default
+
+No `children` passed — renders the component's built-in upload icon and prompt.
+
+<Canvas of={DropZoneStories.Default} />
+
+## Disabled
+
+Removed from tab order, drag events ignored, `aria-disabled` set.
+
+<Canvas of={DropZoneStories.Disabled} />
+
+## Multiple Files
+
+`multiple={true}` allows dropping or selecting more than one file at once.
+
+<Canvas of={DropZoneStories.MultipleFiles} />
+
+## With Accept Filter
+
+`accept` takes MIME types (`application/pdf`), wildcards (`image/*`),
+or extensions (`.pdf`, `.docx`). Non-matching files are silently filtered
+before `onFiles` fires.
+
+<Canvas of={DropZoneStories.WithAcceptFilter} />
+
+## With File Preview
+
+Use `children` to render anything inside the zone — file names, type chips,
+previews, or custom prompts.
+
+<Canvas of={DropZoneStories.WithFilePreview} />
+
+## With FileAttacher
+
+`DropZone` handles click-to-browse itself, but `FileAttacher` can be placed
+outside the zone as a secondary entry point.
+
+<Canvas of={DropZoneStories.WithFileAttacher} />
+
+---
+
+# FileAttacher
+
+A styled button that opens a hidden `<input type="file">` dialog.
+
+<Canvas of={DropZoneStories.FileAttacherDefault} />
+<Canvas of={DropZoneStories.FileAttacherImageOnly} />
+
+---
+
+# FileTypeChip
+
+Colour-coded pill displaying a file type label. Colours are defined in CSS
+via `data-type` attribute selectors — no JS colour map.
+
+To customise a colour in your own context:
+
+```css
+.myContext [data-type="PDF"] {
+    --chip-color: hotpink;
+}
+```
+
+<Canvas of={DropZoneStories.FileTypeChipAllColors} />

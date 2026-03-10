@@ -1,0 +1,169 @@
+/* DropZone - Drag and drop zone for file input */
+
+.dropZone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    padding: 24px;
+    border: 1.5px dashed var(--color-border, #cbd5e1);
+    border-radius: 10px;
+    background-color: var(--color-bg-muted, #f8fafc);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+}
+
+.dropZone:focus-visible {
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+}
+
+.dropZone:hover:not(.disabled) {
+    border-color: var(--color-primary, #3b82f6);
+    background-color: var(--color-bg-subtle, #f1f5f9);
+}
+
+/* Dragging state */
+.dragging {
+    border-style: solid;
+    border-color: var(--color-primary, #3b82f6);
+    background-color: var(--color-primary-tint, #eff6ff);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+}
+
+/* Disabled state */
+.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ── Content wrapper ──────────────────────────────────────────────────────── */
+
+/* display:contents — transparent to layout, only used for visibility toggle */
+.content {
+    display: contents;
+}
+
+.content[data-dragging] {
+    visibility: hidden;
+}
+
+/* ── Default content (no children passed) ─────────────────────────────────── */
+
+.defaultContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.defaultIcon {
+    color: var(--color-text-muted, #94a3b8);
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.dropZone:hover:not(.disabled) .defaultIcon {
+    color: var(--color-primary, #3b82f6);
+    transform: translateY(-2px);
+}
+
+.text {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--color-text-muted, #64748b);
+    line-height: 1.5;
+}
+
+/* "browse" — styled like a subtle link */
+.browse {
+    color: var(--color-primary, #3b82f6);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 2px;
+    transition: text-decoration-color 0.15s ease;
+}
+
+.dropZone:hover:not(.disabled) .browse {
+    text-decoration-color: var(--color-primary, #3b82f6);
+}
+
+/* ── Drag overlay ─────────────────────────────────────────────────────────── */
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-primary-tint, #eff6ff);
+    border-radius: 8px;
+    z-index: 10;
+    animation: fadeIn 0.12s ease-out;
+}
+
+.overlayContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 28px;
+    background-color: var(--color-surface, #ffffff);
+    border-radius: 10px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow:
+        0 4px 16px rgba(59, 130, 246, 0.12),
+        0 1px 3px rgba(0, 0, 0, 0.06);
+    animation: riseIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.overlayIcon {
+    color: var(--color-primary, #3b82f6);
+    animation: bounceUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.overlayText {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-primary, #3b82f6);
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes riseIn {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes bounceUp {
+    from {
+        transform: translateY(4px);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}

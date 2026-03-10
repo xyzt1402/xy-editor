@@ -8,9 +8,9 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
+            "types": "./dist/index.d.ts",
             "import": "./dist/index.js",
-            "require": "./dist/index.cjs",
-            "types": "./dist/index.d.ts"
+            "require": "./dist/index.cjs"
         }
     },
     "files": [
@@ -21,7 +21,9 @@
         "test": "vitest",
         "test:ui": "vitest --ui",
         "lint": "eslint src --ext .ts,.tsx",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "storybook": "storybook dev -p 6006",
+        "build-storybook": "storybook build"
     },
     "dependencies": {
         "@xy-editor/core": "workspace:*",
@@ -29,15 +31,26 @@
         "@xy-editor/ui-tokens": "workspace:*"
     },
     "devDependencies": {
+        "@chromatic-com/storybook": "^5.0.1",
+        "@storybook/addon-a11y": "^10.2.17",
+        "@storybook/addon-docs": "^10.2.17",
+        "@storybook/addon-vitest": "^10.2.17",
+        "@storybook/react": "^10.2.17",
+        "@storybook/react-vite": "^10.2.17",
         "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^16.3.2",
         "@testing-library/user-event": "^14.6.1",
+        "@types/node": "^25.4.0",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.4",
+        "@vitest/browser-playwright": "4.0.18",
+        "@vitest/coverage-v8": "4.0.18",
         "jsdom": "^28.1.0",
+        "playwright": "^1.58.2",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
+        "storybook": "^10.2.17",
         "tsup": "^8.5.1",
         "typescript": "^5.9.3",
         "vitest": "^4.0.18"

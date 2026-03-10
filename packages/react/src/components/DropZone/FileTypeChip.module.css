@@ -1,0 +1,151 @@
+/* FileTypeChip - Pill component displaying file type
+   All colours live here. To add a new type, add a data-type selector below.
+   To override in a specific context: .yourClass [data-type="PDF"] { --chip-color: ...; } */
+
+.chip {
+    --chip-color: #64748b;
+    /* fallback for unknown types */
+
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px 3px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+    border-radius: 6px;
+    cursor: default;
+
+    background-color: color-mix(in srgb, var(--chip-color) 12%, transparent);
+    color: color-mix(in srgb, var(--chip-color) 85%, #000000);
+    border: 1px solid color-mix(in srgb, var(--chip-color) 25%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--chip-color) 10%, #ffffff),
+        0 1px 2px color-mix(in srgb, var(--chip-color) 8%, transparent);
+
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chip:hover {
+    background-color: color-mix(in srgb, var(--chip-color) 18%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--chip-color) 15%, #ffffff),
+        0 2px 4px color-mix(in srgb, var(--chip-color) 12%, transparent);
+}
+
+/* Colour dot */
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--chip-color);
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+/* ── Type colours ─────────────────────────────────────────────────────────── */
+
+/* Documents */
+.chip[data-type="PDF"] {
+    --chip-color: #e53935;
+}
+
+.chip[data-type="DOCX"],
+.chip[data-type="DOC"] {
+    --chip-color: #1565c0;
+}
+
+.chip[data-type="PPTX"],
+.chip[data-type="PPT"] {
+    --chip-color: #d84315;
+}
+
+.chip[data-type="TXT"] {
+    --chip-color: #546e7a;
+}
+
+.chip[data-type="MD"] {
+    --chip-color: #0277bd;
+}
+
+/* Spreadsheets & data */
+.chip[data-type="XLSX"],
+.chip[data-type="XLS"] {
+    --chip-color: #2e7d32;
+}
+
+.chip[data-type="CSV"] {
+    --chip-color: #00796b;
+}
+
+.chip[data-type="JSON"] {
+    --chip-color: #f57f17;
+}
+
+.chip[data-type="XML"] {
+    --chip-color: #ef6c00;
+}
+
+/* Web */
+.chip[data-type="HTML"] {
+    --chip-color: #e65100;
+}
+
+.chip[data-type="CSS"] {
+    --chip-color: #0277bd;
+}
+
+.chip[data-type="JS"] {
+    --chip-color: #f9a825;
+}
+
+.chip[data-type="TS"] {
+    --chip-color: #1565c0;
+}
+
+/* Images */
+.chip[data-type="PNG"],
+.chip[data-type="JPG"],
+.chip[data-type="JPEG"],
+.chip[data-type="WEBP"] {
+    --chip-color: #6a1b9a;
+}
+
+.chip[data-type="GIF"] {
+    --chip-color: #ad1457;
+}
+
+.chip[data-type="SVG"] {
+    --chip-color: #00838f;
+}
+
+/* Archives */
+.chip[data-type="ZIP"] {
+    --chip-color: #e65100;
+}
+
+.chip[data-type="RAR"],
+.chip[data-type="7Z"] {
+    --chip-color: #bf360c;
+}
+
+/* Audio */
+.chip[data-type="MP3"] {
+    --chip-color: #c2185b;
+}
+
+.chip[data-type="WAV"] {
+    --chip-color: #ad1457;
+}
+
+/* Video */
+.chip[data-type="MP4"],
+.chip[data-type="AVI"],
+.chip[data-type="MOV"],
+.chip[data-type="WEBM"] {
+    --chip-color: #4527a0;
+}

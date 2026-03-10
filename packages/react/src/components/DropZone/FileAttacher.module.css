@@ -1,0 +1,76 @@
+/* FileAttacher - Button that opens a hidden file input */
+
+/* Visually hidden input — accessible hide pattern.
+   display:none would remove it from the accessibility tree entirely;
+   this keeps it present for programmatic click() while invisible. */
+.input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Button ───────────────────────────────────────────────────────────────── */
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--color-text, #1e293b);
+    background-color: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    /* transition: all is an antipattern — only transition what changes */
+}
+
+.button:hover:not(.disabled) {
+    background-color: var(--color-bg-subtle, #f1f5f9);
+    border-color: var(--color-primary, #3b82f6);
+}
+
+.button:focus-visible {
+    /* focus-visible instead of focus — keyboard only, not mouse clicks */
+    outline: 2px solid var(--color-primary, #3b82f6);
+    outline-offset: 2px;
+}
+
+.button:active:not(.disabled) {
+    transform: scale(0.98);
+}
+
+/* ── States ───────────────────────────────────────────────────────────────── */
+
+.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ── Icon ─────────────────────────────────────────────────────────────────── */
+
+.icon {
+    color: var(--color-text-muted, #64748b);
+    flex-shrink: 0;
+    transition: color 0.15s ease;
+}
+
+.button:hover:not(.disabled) .icon {
+    color: var(--color-primary, #3b82f6);
+}
+
+/* ── Label ────────────────────────────────────────────────────────────────── */
+
+.label {
+    line-height: 1;
+}

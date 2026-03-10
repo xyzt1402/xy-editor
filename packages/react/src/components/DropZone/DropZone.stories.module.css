@@ -1,0 +1,51 @@
+/* Story layout helpers — used only in .stories.tsx, never shipped */
+
+.storyContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+    text-align: center;
+}
+
+.storyIcon {
+    color: #94a3b8;
+}
+
+.storyLabel {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.storyLabelPrimary {
+    font-size: 13px;
+    font-weight: 500;
+    color: #3b82f6;
+}
+
+.storyFilename {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.storyChips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.storyComposed {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fileTypeGrid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px;
+}
