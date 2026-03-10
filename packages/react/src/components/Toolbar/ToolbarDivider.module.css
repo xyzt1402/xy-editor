@@ -1,0 +1,12 @@
+/**
+ * ToolbarDivider styles.
+ * @package @xy-editor/react
+ */
+
+.divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--toolbar-divider-color, #e5e7eb);
+    margin: 0 8px;
+    flex-shrink: 0;
+}

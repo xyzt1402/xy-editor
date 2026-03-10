@@ -1,0 +1,83 @@
+/**
+ * ToolbarButton styles.
+ * @package @xy-editor/react
+ */
+
+.button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background-color: transparent;
+    color: var(--toolbar-button-color, #374151);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.button:hover:not([data-disabled]) {
+    background-color: var(--toolbar-button-hover-bg, #f3f4f6);
+}
+
+.button:focus-visible {
+    outline: 2px solid var(--toolbar-focus-outline-color, #3b82f6);
+    outline-offset: 2px;
+}
+
+.button[data-active] {
+    background-color: var(--toolbar-button-active-bg, #e5e7eb);
+    color: var(--toolbar-button-active-color, #111827);
+}
+
+.button[data-disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+/* CSS-only tooltip */
+.tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background-color: var(--tooltip-bg, #1f2937);
+    color: var(--tooltip-color, #ffffff);
+    font-size: 12px;
+    white-space: nowrap;
+    border-radius: 4px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Arrow */
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--tooltip-bg, #1f2937);
+}
+
+.button:hover .tooltip,
+.button:focus-visible .tooltip {
+    opacity: 1;
+    visibility: visible;
+}

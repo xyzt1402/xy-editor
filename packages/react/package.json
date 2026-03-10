@@ -17,9 +17,11 @@
         "dist"
     ],
     "scripts": {
-        "build": "tsup",
-        "test": "vitest",
+        "test": "vitest --project unit",
+        "test:storybook": "vitest --project storybook",
+        "test:all": "vitest",
         "test:ui": "vitest --ui",
+        "test:coverage": "vitest --project unit --coverage",
         "lint": "eslint src --ext .ts,.tsx",
         "typecheck": "tsc --noEmit",
         "storybook": "storybook dev -p 6006",
@@ -28,7 +30,8 @@
     "dependencies": {
         "@xy-editor/core": "workspace:*",
         "@xy-editor/file-ingestion": "workspace:*",
-        "@xy-editor/ui-tokens": "workspace:*"
+        "@xy-editor/ui-tokens": "workspace:*",
+        "lucide-react": "^0.468.0"
     },
     "devDependencies": {
         "@chromatic-com/storybook": "^5.0.1",
