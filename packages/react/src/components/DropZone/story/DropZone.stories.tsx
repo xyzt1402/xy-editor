@@ -4,11 +4,11 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/react';
-import { DropZone } from './DropZone';
-import type { DropZoneProps } from './DropZone';
-import { FileAttacher } from './FileAttacher';
-import { FileTypeChip } from './FileTypeChip';
-import { UploadIcon } from './assets/UploadIcon';
+import { DropZone } from '../DropZone';
+import type { DropZoneProps } from '../DropZone';
+import { FileAttacher } from '../FileAttacher';
+import { FileTypeChip } from '../FileTypeChip';
+import { UploadIcon } from '../assets/UploadIcon';
 import styles from './DropZone.stories.module.css';
 
 // ─── DropZone Meta ────────────────────────────────────────────────────────────
