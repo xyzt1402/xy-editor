@@ -7,7 +7,7 @@ import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react';
 import { EditorProvider } from '../../context/EditorContext';
-import { createEmptyState } from '@xy-editor/core';
+import { createEmptyState, EditorState } from '@xy-editor/core';
 import { Toolbar } from './Toolbar';
 import { ToolbarButton } from './ToolbarButton';
 import { ToolbarDivider } from './ToolbarDivider';
@@ -19,8 +19,21 @@ import styles from './Toolbar.stories.module.css';
 
 // ─── Decorator ────────────────────────────────────────────────────────────────
 
+function makeStateWithSelection(): EditorState {
+    const state = createEmptyState();
+    const textNode = state.doc.children![0]!.children![0]!; // doc → paragraph → text
+    return {
+        ...state,
+        selection: {
+            anchor: { nodeId: textNode.id, offset: 0 },
+            focus: { nodeId: textNode.id, offset: 0 },
+            isCollapsed: true,
+        },
+    };
+}
+
 const withEditor = (Story: () => React.JSX.Element) => (
-    <EditorProvider defaultValue={createEmptyState()}>
+    <EditorProvider defaultValue={makeStateWithSelection()}>
         <Story />
     </EditorProvider>
 );
@@ -46,7 +59,7 @@ export const Default: Story = {};
 export const WithCustomClassName: Story = {
     name: 'Custom className',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <Toolbar className={styles.customToolbar} />
         </EditorProvider>
     ),
@@ -55,7 +68,7 @@ export const WithCustomClassName: Story = {
 export const WithCustomChildren: Story = {
     name: 'Custom trailing children',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <Toolbar>
                 <ToolbarButton
                     icon={<span aria-hidden="true">🔗</span>}
@@ -70,7 +83,7 @@ export const WithCustomChildren: Story = {
 export const EmptyToolbar: Story = {
     name: 'Empty (groups=[])',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <Toolbar groups={[]} />
         </EditorProvider>
     ),
@@ -81,7 +94,7 @@ export const EmptyToolbar: Story = {
 export const ToolbarButtonVariants: Story = {
     name: 'ToolbarButton — variants',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <ToolbarButton icon={<Bold size={16} />} label="Bold" onClick={() => { }} />
                 <ToolbarButton icon={<Bold size={16} />} label="Bold active" onClick={() => { }} active />
@@ -95,7 +108,7 @@ export const ToolbarButtonVariants: Story = {
 export const FontPickerStory: Story = {
     name: 'FontPicker',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <FontPicker />
             </div>
@@ -106,7 +119,7 @@ export const FontPickerStory: Story = {
 export const SizePickerStory: Story = {
     name: 'SizePicker',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <SizePicker />
             </div>
@@ -117,7 +130,7 @@ export const SizePickerStory: Story = {
 export const ColorButtonVariants: Story = {
     name: 'ColorButton — text & highlight',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <ColorButton type="text" />
                 <ColorButton type="highlight" />
@@ -129,7 +142,7 @@ export const ColorButtonVariants: Story = {
 export const AlignButtonVariants: Story = {
     name: 'AlignButton — all alignments',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <AlignButton align="left" icon={<AlignLeft size={16} />} />
                 <AlignButton align="center" icon={<AlignCenter size={16} />} />
@@ -143,7 +156,7 @@ export const AlignButtonVariants: Story = {
 export const DividerStory: Story = {
     name: 'ToolbarDivider',
     render: () => (
-        <EditorProvider defaultValue={createEmptyState()}>
+        <EditorProvider defaultValue={makeStateWithSelection()}>
             <div className={styles.row}>
                 <ToolbarButton icon={<Bold size={16} />} label="Bold" onClick={() => { }} />
                 <ToolbarDivider />

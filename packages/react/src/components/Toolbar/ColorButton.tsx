@@ -24,21 +24,31 @@ const DEFAULTS: Record<ColorButtonProps['type'], string> = {
     highlight: '#fef08a',
 };
 
+const MARK_TYPE: Record<ColorButtonProps['type'], string> = {
+    text: 'color',
+    highlight: 'highlight',
+};
+
 export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentColor, setCurrentColor] = useState(DEFAULTS[type]);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
+
     const { commands, getAttributes } = useEditor();
 
     const label = type === 'text' ? 'Text color' : 'Highlight color';
 
-    // Sync current color from editor state
-    const attrKey = type === 'text' ? 'color' : 'highlight';
-    const editorColor = getAttributes(attrKey)?.[attrKey] as string | null;
+    const markType = MARK_TYPE[type];
+    const editorColor = getAttributes(markType)?.color as string | undefined;
     const indicatorColor = editorColor ?? DEFAULTS[type];
 
-    // Close on Escape
+    const [pickerValue, setPickerValue] = useState(indicatorColor);
+    const handleOpen = () => {
+        setPickerValue(indicatorColor);
+        setIsOpen((v) => !v);
+    };
+
+    // ── Close on Escape ───────────────────────────────────────────────────────
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,7 +61,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isOpen]);
 
-    // Close on click outside
+    // ── Close on click outside ────────────────────────────────────────────────
     useEffect(() => {
         if (!isOpen) return;
         const handleMouseDown = (e: MouseEvent) => {
@@ -66,8 +76,8 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, [isOpen]);
 
+    // ── Apply a preset swatch ─────────────────────────────────────────────────
     const applyColor = useCallback((color: string) => {
-        setCurrentColor(color);
         if (type === 'text') {
             commands.setColor(color);
         } else {
@@ -76,18 +86,31 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
         setIsOpen(false);
     }, [type, commands]);
 
+    // ── Native color input (live preview while dragging) ──────────────────────
     const handleNativeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Update live as user picks — don't close until they commit
-        setCurrentColor(e.target.value);
+        const color = e.target.value;
+        setPickerValue(color);
         if (type === 'text') {
-            commands.setColor(e.target.value);
+            commands.setColor(color);
         } else {
-            commands.setHighlight(e.target.value);
+            commands.setHighlight(color);
         }
     };
 
     return (
         <div className={styles.container}>
+            {/*
+             * --indicator-color is set on the button in both cases.
+             *
+             * type="text"      → .indicator span reads it for the underbar.
+             *                    Button background is unchanged.
+             *
+             * type="highlight" → CSS rule
+             *                    .button[data-color-type="highlight"]
+             *                    sets background-color: var(--indicator-color).
+             *                    No extra elements needed — the button itself
+             *                    becomes the color swatch.
+             */}
             <button
                 ref={buttonRef}
                 type="button"
@@ -96,14 +119,17 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
                 aria-expanded={isOpen}
                 aria-haspopup="listbox"
                 data-color-type={type}
-                onClick={() => setIsOpen((v) => !v)}
+                onClick={handleOpen}
+                style={{ '--indicator-color': indicatorColor } as React.CSSProperties}
             >
-                {/* Indicator bar — colour set via CSS custom property, no inline style */}
+                {type === 'text' ? 'A' : 'H'}
                 <span
                     className={styles.indicator}
                     data-color-type={type}
-                    style={{ '--indicator-color': indicatorColor } as React.CSSProperties}
-                />
+                    aria-hidden="true"
+                >
+                    <span className={styles.indicatorBar} />
+                </span>
             </button>
 
             {isOpen && (
@@ -125,8 +151,6 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
                                 aria-label={`Select color ${color}`}
                                 aria-selected={indicatorColor === color}
                                 onClick={() => applyColor(color)}
-                                // Single CSS custom property — minimal, accepted pattern
-                                // (same approach as FileTypeChip --chip-color)
                                 style={{ '--c': color } as React.CSSProperties}
                             />
                         ))}
@@ -140,7 +164,7 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
                             id={`color-input-${type}`}
                             type="color"
                             className={styles.nativeInput}
-                            value={currentColor}
+                            value={pickerValue}
                             onChange={handleNativeChange}
                             aria-label="Custom color"
                         />

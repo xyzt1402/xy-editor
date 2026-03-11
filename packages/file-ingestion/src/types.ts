@@ -1,7 +1,12 @@
 /**
  * Core types for the file-ingestion package.
  * @package @xy-editor/file-ingestion
- * @module types */
+ * @module types
+ *
+ * CHANGE: Added 'CONVERT_FAILED' to FileIngestionErrorCode (BUG-11 fix).
+ * This code is used when convertToEditorState throws — it is distinct from
+ * 'PARSE_FAILED' which covers errors in the parser phase only.
+ */
 
 // ─── Raw Block Types ──────────────────────────────────────────────────────────
 
@@ -25,15 +30,13 @@ export interface RawInlineMark {
 export interface RawBlock {
     type: RawBlockType;
     text: string;
-    level?: number;                      // headings: 1–6
-    marks?: RawInlineMark[];             // inline formatting ranges
-    data?: Record<string, unknown>;      // parser-specific extras (e.g. table cells, image src)
+    level?: number;
+    marks?: RawInlineMark[];
+    data?: Record<string, unknown>;
 }
 
 // ─── File Meta ────────────────────────────────────────────────────────────────
-/**
- * Metadata about the source file.
- */
+
 export interface FileMeta {
     filename: string;
     mimeType: string;
@@ -43,9 +46,7 @@ export interface FileMeta {
 }
 
 // ─── Raw Content ──────────────────────────────────────────────────────────────
-/**
- * Raw content extracted from a file, consisting of multiple blocks.
- */
+
 export interface RawContent {
     blocks: RawBlock[];
     meta: FileMeta;
@@ -54,11 +55,8 @@ export interface RawContent {
 // ─── Parser Interface ─────────────────────────────────────────────────────────
 
 export interface Parser {
-    /** MIME types this parser handles */
     mimeTypes: string[];
-    /** File extensions this parser handles (lowercase, no dot) */
     extensions: string[];
-    /** Parse a file into RawContent */
     parse(file: File): Promise<RawContent>;
 }
 
@@ -66,7 +64,6 @@ export interface Parser {
 
 export interface DetectionResult {
     parser: Parser;
-    /** How the parser was matched */
     matchedBy: 'mime' | 'extension' | 'fallback';
 }
 
@@ -87,4 +84,5 @@ export type FileIngestionErrorCode =
     | 'FILE_EMPTY'
     | 'FILE_TOO_LARGE'
     | 'PARSE_FAILED'
+    | 'CONVERT_FAILED'
     | 'UNSUPPORTED_TYPE';

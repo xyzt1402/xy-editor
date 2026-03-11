@@ -2,11 +2,13 @@
  * Hook to access undo/redo functionality.
  * @package @xy-editor/react
  * @module hooks/useHistory
+ *
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { useEditorContext } from '../context/EditorContext';
 import { undo as coreUndo, redo as coreRedo } from '@xy-editor/core';
+import type { EditorState } from '@xy-editor/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,37 +50,36 @@ export interface UseHistoryReturn {
 export function useHistory(): UseHistoryReturn {
     const { state, setState } = useEditorContext();
 
-    // Derived inline — a boolean comparison is cheaper than useMemo overhead
+    // Commands read stateRef.current rather than capturing `state` directly.
+    // This ensures rapid successive calls always see the latest state rather
+    // than the same stale snapshot from a previous render cycle.
+    const stateRef = useRef<EditorState>(state);
+    useEffect(() => {
+        stateRef.current = state;
+    }, [state]);
+
+    // Derived inline from live state for accurate disabled states in the UI.
+    // These are primitives — React compares by value so no extra memoization needed.
     const canUndo = state.history.past.length > 0;
     const canRedo = state.history.future.length > 0;
 
     // ── undo ──────────────────────────────────────────────────────────────────
-    // coreUndo computes the complete previous EditorState from the history
-    // stack. We replace state wholesale via setState — NOT via dispatch/
-    // applyTransaction — because undo is restoring a snapshot, not applying
-    // an incremental transform.
+    // BUG-05 fix: reads stateRef.current, not the captured `state`.
+    // BP-01 fix: `setState` is the only dep — callback is truly stable.
     const undo = useCallback(() => {
-        if (!canUndo) return; // guard prevents calling coreUndo unnecessarily
-
-        const previousState = coreUndo(state);
-        if (previousState) {
-            setState(previousState);
-        }
-    }, [state, setState, canUndo]);
+        const current = stateRef.current;
+        if (current.history.past.length === 0) return;
+        const previousState = coreUndo(current);
+        if (previousState) setState(previousState);
+    }, [setState]);
 
     // ── redo ──────────────────────────────────────────────────────────────────
     const redo = useCallback(() => {
-        if (!canRedo) return;
+        const current = stateRef.current;
+        if (current.history.future.length === 0) return;
+        const nextState = coreRedo(current);
+        if (nextState) setState(nextState);
+    }, [setState]);
 
-        const nextState = coreRedo(state);
-        if (nextState) {
-            setState(nextState);
-        }
-    }, [state, setState, canRedo]);
-
-    // Return a plain object — no useMemo needed.
-    // canUndo/canRedo are primitives (stable by value).
-    // undo/redo are stable useCallback refs.
-    // React's reconciler handles this efficiently without memoization.
     return { canUndo, canRedo, undo, redo };
 }

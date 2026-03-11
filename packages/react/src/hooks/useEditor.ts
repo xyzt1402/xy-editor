@@ -2,6 +2,7 @@
  * Hook to access the editor instance with commands.
  * @package @xy-editor/react
  * @module hooks/useEditor
+ *
  */
 
 import { useMemo, useCallback, useRef, useEffect } from 'react';
@@ -19,12 +20,10 @@ import type { MarkType, EditorNode, EditorState, Transaction, SelectionPoint } f
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface EditorConfig {
-    /** Optional node ID for the editor DOM element */
     editorNodeId?: string;
 }
 
 export interface EditorCommands {
-    // Marks
     bold: () => void;
     italic: () => void;
     underline: () => void;
@@ -34,12 +33,9 @@ export interface EditorCommands {
     setHighlight: (hex: string) => void;
     setFontSize: (size: number) => void;
     setFontFamily: (family: string) => void;
-    // Alignment
     setAlignment: (align: 'left' | 'center' | 'right' | 'justify') => void;
-    // History
     undo: () => void;
     redo: () => void;
-    // Content
     insertText: (text: string) => void;
     insertNode: (node: EditorNode) => void;
     clearAll: () => void;
@@ -48,8 +44,27 @@ export interface EditorCommands {
 export interface EditorInstance {
     state: EditorState;
     commands: EditorCommands;
+    /** Returns true when the given mark is active across the entire selection. */
     isActive: (markType: MarkType) => boolean;
+    /**
+     * Returns the attrs object of a MARK on the current selection, or null.
+     * Use this for inline mark attributes: color, highlight.
+     *
+     * @example
+     * const color = getAttributes('color')?.color ?? null;
+     */
     getAttributes: (markType: MarkType) => Record<string, unknown> | null;
+    /**
+     * Returns the value of a BLOCK NODE attribute at the current cursor
+     * position, or undefined when no matching block or key is found.
+     * Use this for block-level attributes: fontSize, fontFamily, alignment.
+     *
+     * @example
+     * const size   = getNodeAttribute('fontSize')  as number  ?? 16;
+     * const family = getNodeAttribute('fontFamily') as string ?? 'sans-serif';
+     * const align  = getNodeAttribute('alignment')  as string ?? 'left';
+     */
+    getNodeAttribute: (key: string) => unknown;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -63,15 +78,13 @@ export interface EditorInstance {
  *
  * @example
  * ```tsx
- * const { commands, isActive } = useEditor();
+ * const { commands, isActive, getNodeAttribute } = useEditor();
  *
  * return (
- *   <button
- *     onClick={() => commands.bold()}
- *     data-active={isActive('bold')}
- *   >
- *     Bold
- *   </button>
+ *   <>
+ *     <button onClick={commands.bold} data-active={isActive('bold')}>Bold</button>
+ *     <select value={getNodeAttribute('fontFamily') as string ?? ''}>…</select>
+ *   </>
  * );
  * ```
  */
@@ -79,80 +92,163 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
     const { state, dispatch, setState } = useEditorContext();
 
     // ── Stable state ref ──────────────────────────────────────────────────────
-    // Commands close over stateRef.current rather than state directly.
-    // This means commands are created once (stable refs) but always operate
-    // on the latest state — no stale closure bugs.
-    const stateRef = useRef(state);
+    // Commands read stateRef.current so they always operate on the latest state
+    // without needing state as a dependency — this keeps command refs stable.
+    const stateRef = useRef<EditorState>(state);
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
-    // ── Internal helpers ──────────────────────────────────────────────────────
-
-    /**
-     * Builds a setNode transaction targeting the current selection.
-     * Used for font size, font family, and alignment commands.
-     *
-     * When no selection exists, falls back to the first text node in the document.
-     */
+    // ── makeSetNodeTransaction ────────────────────────────────────
+    //
+    // Resolves the setNode target to the BLOCK ancestor of the anchor text node.
+    //
+    // Why this matters:
+    //   selection.anchor.nodeId always points to a type:'text' leaf because
+    //   selections are always placed inside text content.  Block-level
+    //   attributes (fontSize, fontFamily, alignment) must live on the parent
+    //   block (paragraph, heading, listItem…), not on the text leaf.
+    //   Writing them to the text leaf means no renderer or getNodeAttribute
+    //   call that inspects paragraph.attrs will ever see them.
+    //
+    // Resolution order:
+    //   1. Use selection.anchor if a selection exists → find its block ancestor.
+    //   2. Fall back to the first text node in the doc → find its block ancestor.
+    //   3. If no block can be found (malformed doc), return a no-op transaction.
     const makeSetNodeTransaction = useCallback(
         (data: Record<string, unknown>): Transaction => {
             const current = stateRef.current;
 
-            // Find a default position if no selection exists
-            let position: { anchor: SelectionPoint; focus: SelectionPoint } | undefined;
+            const anchorNodeId =
+                current.selection?.anchor.nodeId ??
+                findFirstTextNode(current.doc)?.id;
 
-            if (current.selection) {
-                position = {
-                    anchor: current.selection.anchor,
-                    focus: current.selection.focus,
-                };
-            } else if (current.doc.children?.length) {
-                // Fallback: use the first text node in the document
-                const firstTextNode = findFirstTextNode(current.doc);
-                if (firstTextNode) {
-                    position = {
-                        anchor: { nodeId: firstTextNode.id, offset: 0 },
-                        focus: { nodeId: firstTextNode.id, offset: 0 },
-                    };
-                }
+            if (!anchorNodeId) {
+                // Malformed document — nothing to target
+                return { id: generateId(), steps: [] };
             }
+
+            // Walk up from the text leaf to the nearest non-text block container
+            const blockNode = findNearestBlock(current.doc, anchorNodeId);
+
+            if (!blockNode) {
+                // No block ancestor found — no-op
+                return { id: generateId(), steps: [] };
+            }
+
+            const position: { anchor: SelectionPoint; focus: SelectionPoint } = {
+                anchor: { nodeId: blockNode.id, offset: 0 },
+                focus: { nodeId: blockNode.id, offset: 0 },
+            };
 
             return {
                 id: generateId(),
-                steps: [
-                    {
-                        type: 'setNode',
-                        data,
-                        position,
-                    },
-                ],
+                steps: [{ type: 'setNode', data, position }],
             };
         },
-        [], // stable — reads from ref, no deps needed
+        [], // reads from ref only — no deps needed
     );
 
     // ── Commands ──────────────────────────────────────────────────────────────
-    // Each command dispatches internally and returns void.
-    // deps array only includes stable values (dispatch, setState, makeSetNodeTransaction)
-    // so the commands object reference is stable across renders.
 
     const commands = useMemo<EditorCommands>(
         () => ({
             // ── Mark commands ────────────────────────────────────────────────
-            bold: () => dispatch(toggleMark(stateRef.current, 'bold')),
-            italic: () => dispatch(toggleMark(stateRef.current, 'italic')),
-            underline: () => dispatch(toggleMark(stateRef.current, 'underline')),
-            strike: () => dispatch(toggleMark(stateRef.current, 'strikethrough')),
-            code: () => dispatch(toggleMark(stateRef.current, 'code')),
-            setColor: (hex: string) =>
-                dispatch(addMark(stateRef.current, 'color', { color: hex })),
-            setHighlight: (hex: string) =>
-                dispatch(addMark(stateRef.current, 'highlight', { color: hex })),
+            //
+            // All inline marks share the same three-way dispatch:
+            //
+            //   selection === null        → no caret at all (Storybook / no canvas)
+            //   selection.isCollapsed     → caret placed, no text range selected
+            //   selection is a range      → text is selected
+            //
+            // For toggle marks (bold, italic, underline, strike, code):
+            //   null       → no-op. There is no caret to anchor the intent to.
+            //   collapsed  → toggleStoredMark: queue the mark for the next typed
+            //                character.  This is the standard behaviour — pressing
+            //                Cmd+B with a caret placed arms bold for what you type
+            //                next, exactly as Word / Google Docs behave.
+            //   range      → dispatch toggleMark: apply to the selected text.
+            //
+            // For set marks (setColor, setHighlight):
+            //   null       → setStoredMark: even without a caret we update
+            //                storedMarks so the color indicator reflects the choice
+            //                immediately (important for Storybook / bare toolbar).
+            //   collapsed  → setStoredMark: same as null — queue for next char.
+            //   range      → dispatch addMark: apply to the selected text.
+            //
+            // Why storedMarks — not a dispatch — for the collapsed/null cases:
+            //   core's toggleMark / addMark both call requirePosition(), which
+            //   throws when selection is null or treats a collapsed selection as
+            //   having nothing to mark.  storedMarks is the core's own mechanism
+            //   for exactly this situation: insertText consumes them and merges
+            //   them onto the newly typed text node.
+            bold: () => {
+                const current = stateRef.current;
+                if (!current.selection) return;
+                if (current.selection.isCollapsed) {
+                    setState(toggleStoredMark(current, 'bold'));
+                    return;
+                }
+                dispatch(toggleMark(current, 'bold'));
+            },
+            italic: () => {
+                const current = stateRef.current;
+                if (!current.selection) return;
+                if (current.selection.isCollapsed) {
+                    setState(toggleStoredMark(current, 'italic'));
+                    return;
+                }
+                dispatch(toggleMark(current, 'italic'));
+            },
+            underline: () => {
+                const current = stateRef.current;
+                if (!current.selection) return;
+                if (current.selection.isCollapsed) {
+                    setState(toggleStoredMark(current, 'underline'));
+                    return;
+                }
+                dispatch(toggleMark(current, 'underline'));
+            },
+            strike: () => {
+                const current = stateRef.current;
+                if (!current.selection) return;
+                if (current.selection.isCollapsed) {
+                    setState(toggleStoredMark(current, 'strikethrough'));
+                    return;
+                }
+                dispatch(toggleMark(current, 'strikethrough'));
+            },
+            code: () => {
+                const current = stateRef.current;
+                if (!current.selection) return;
+                if (current.selection.isCollapsed) {
+                    setState(toggleStoredMark(current, 'code'));
+                    return;
+                }
+                dispatch(toggleMark(current, 'code'));
+            },
+            setColor: (hex: string) => {
+                const current = stateRef.current;
+                if (!current.selection || current.selection.isCollapsed) {
+                    setState(setStoredMark(current, 'color', { color: hex }));
+                    return;
+                }
+                dispatch(addMark(current, 'color', { color: hex }));
+            },
+            setHighlight: (hex: string) => {
+                const current = stateRef.current;
+                if (!current.selection || current.selection.isCollapsed) {
+                    setState(setStoredMark(current, 'highlight', { color: hex }));
+                    return;
+                }
+                dispatch(addMark(current, 'highlight', { color: hex }));
+            },
 
             // ── Node attribute commands ──────────────────────────────────────
-            // These use setNode steps to update block/inline attrs
-            // rather than marks, since font/alignment apply to nodes not spans.
+            // These target the block ancestor (SB-02 fix via makeSetNodeTransaction).
+            // No selection guard needed — makeSetNodeTransaction falls back to the
+            // first text node in the doc when selection is null, so font/alignment
+            // changes work even in Storybook stories without a canvas.
             setFontSize: (size: number) =>
                 dispatch(makeSetNodeTransaction({ fontSize: size })),
             setFontFamily: (family: string) =>
@@ -161,9 +257,6 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
                 dispatch(makeSetNodeTransaction({ alignment: align })),
 
             // ── History commands ─────────────────────────────────────────────
-            // undo/redo replace state wholesale — they do NOT go through
-            // applyTransaction because they need to restore a previous snapshot,
-            // not apply incremental steps. setState bypasses applyTransaction.
             undo: () => {
                 const newState = coreUndo(stateRef.current);
                 if (newState) setState(newState);
@@ -178,18 +271,16 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
                 const current = stateRef.current;
                 dispatch({
                     id: generateId(),
-                    steps: [
-                        {
-                            type: 'insertText',
-                            data: { text },
-                            position: current.selection
-                                ? {
-                                    anchor: current.selection.anchor,
-                                    focus: current.selection.focus,
-                                }
-                                : undefined,
-                        },
-                    ],
+                    steps: [{
+                        type: 'insertText',
+                        data: { text },
+                        position: current.selection
+                            ? {
+                                anchor: current.selection.anchor,
+                                focus: current.selection.focus,
+                            }
+                            : undefined,
+                    }],
                 });
             },
 
@@ -197,57 +288,64 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
                 const current = stateRef.current;
                 dispatch({
                     id: generateId(),
-                    steps: [
-                        {
-                            type: 'insertNode',
-                            node,
-                            position: current.selection
-                                ? {
-                                    anchor: current.selection.anchor,
-                                    focus: current.selection.focus,
-                                }
-                                : undefined,
-                        },
-                    ],
+                    steps: [{
+                        type: 'insertNode',
+                        node,
+                        position: current.selection
+                            ? {
+                                anchor: current.selection.anchor,
+                                focus: current.selection.focus,
+                            }
+                            : undefined,
+                    }],
                 });
             },
 
             clearAll: () => {
                 dispatch({
                     id: generateId(),
-                    steps: [{ type: 'deleteNode' }],
+                    steps: [{ type: 'clearDoc' }],
                 });
             },
         }),
         [dispatch, setState, makeSetNodeTransaction],
-        // ↑ stable deps only — commands object reference stays stable across renders
     );
 
     // ── isActive ──────────────────────────────────────────────────────────────
-    // Delegates to core's isMarkActiveInSelection which correctly traverses
-    // the document tree for range selections and checks storedMarks for carets.
+    // Delegates to core's isMarkActiveInSelection which checks storedMarks for
+    // collapsed selections and traverses the document tree for range selections.
     const isActive = useCallback(
-        (markType: MarkType): boolean => {
-            return isMarkActiveInSelection(state, markType);
-        },
+        (markType: MarkType): boolean => isMarkActiveInSelection(state, markType),
         [state],
     );
 
-    // ── getAttributes ─────────────────────────────────────────────────────────
-    // Reads mark attributes from the current selection.
-    // Checks storedMarks for collapsed selections, document tree for ranges.
+    // ── getAttributes (mark attrs only) ───────────────────────────────────────
+    // Reads the attrs object of an inline MARK on the current selection.
+    // Only covers mark-based attributes: color, highlight.
+    // For block-level attributes use getNodeAttribute() instead.
+    //
+    // Priority order:
+    //   1. storedMarks are always checked first — they are queued marks for the
+    //      next typed character and are the source of truth when nothing is
+    //      selected (e.g. Storybook with no canvas, or after setColor was called
+    //      with no active selection).  This makes the color indicator update
+    //      immediately after the user picks a color, even with no text selected.
+    //   2. No selection and no storedMarks → null.
+    //   3. Collapsed caret — storedMarks already checked; nothing else to read.
+    //   4. Range selection — walk text nodes in range and return the first match.
     const getAttributes = useCallback(
         (markType: MarkType): Record<string, unknown> | null => {
+            // Step 1: storedMarks — valid regardless of selection state
+            const stored = (state.storedMarks ?? []).find((m) => m.type === markType);
+            if (stored?.attrs) return stored.attrs;
+
+            // Step 2: no selection at all — nothing more to check
             if (!state.selection) return null;
 
-            // Collapsed selection — check storedMarks
-            if (state.selection.isCollapsed) {
-                const mark = (state.storedMarks ?? []).find((m) => m.type === markType);
-                return mark?.attrs ?? null;
-            }
+            // Step 3: collapsed caret — storedMarks already exhausted above
+            if (state.selection.isCollapsed) return null;
 
-            // Range selection — find the first matching mark in the selection
-            // (attrs are typically uniform across a selection for font/color)
+            // Step 4: range selection — first matching text node in the range
             const textNodes = collectTextNodesInSelection(state);
             for (const node of textNodes) {
                 const mark = (node.marks ?? []).find((m) => m.type === markType);
@@ -259,17 +357,93 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
         [state],
     );
 
-    return useMemo(
-        () => ({ state, commands, isActive, getAttributes }),
-        [state, commands, isActive, getAttributes],
+    // ── getNodeAttribute (block attrs only — SB-03 fix) ───────────────────────
+    //
+    // Reads a single attribute from the BLOCK CONTAINER that holds the current
+    // cursor position.  This is the correct read path for fontSize, fontFamily,
+    // and alignment because those values live in block.attrs, not in marks[].
+    //
+    // Resolution:
+    //   1. Prefer selection.anchor to find the current block.
+    //   2. Fall back to the first text node's block ancestor when no selection.
+    //   3. Return undefined if no block or key is found.
+    //
+    // Usage in toolbar components:
+    //   const family = getNodeAttribute('fontFamily') as string | undefined;
+    //   const size   = getNodeAttribute('fontSize')   as number | undefined;
+    //   const align  = getNodeAttribute('alignment')  as string | undefined;
+    const getNodeAttribute = useCallback(
+        (key: string): unknown => {
+            const anchorNodeId =
+                state.selection?.anchor.nodeId ??
+                findFirstTextNode(state.doc)?.id;
+
+            if (!anchorNodeId) return undefined;
+
+            const blockNode = findNearestBlock(state.doc, anchorNodeId);
+            return blockNode?.attrs?.[key];
+        },
+        [state],
     );
+
+    return { state, commands, isActive, getAttributes, getNodeAttribute };
 }
 
 // ─── Internal Utilities ───────────────────────────────────────────────────────
 
 /**
+ * Finds the nearest block-level ancestor of `nodeId`.
+ *
+ * A "block" is any node whose type is not 'text' — i.e. paragraph, heading,
+ * listItem, blockquote, codeBlock, tableRow, etc.
+ *
+ * If `nodeId` itself is already a block (not a text leaf), returns that node.
+ * If `nodeId` is a text leaf, returns its parent.
+ * Returns undefined if the node cannot be found in the tree.
+ */
+function findNearestBlock(
+    doc: EditorNode,
+    nodeId: string,
+): EditorNode | undefined {
+    const node = findNodeById(doc, nodeId);
+
+    // Already a block — return it directly
+    if (node && node.type !== 'text') return node;
+
+    // Text leaf — return its parent block
+    return findParentNode(doc, nodeId);
+}
+
+/**
+ * Finds a node by ID anywhere in the tree.
+ */
+function findNodeById(root: EditorNode, id: string): EditorNode | undefined {
+    if (root.id === id) return root;
+    for (const child of root.children ?? []) {
+        const found = findNodeById(child, id);
+        if (found) return found;
+    }
+    return undefined;
+}
+
+/**
+ * Finds the direct parent of `targetId` anywhere in the tree.
+ */
+function findParentNode(
+    root: EditorNode,
+    targetId: string,
+): EditorNode | undefined {
+    for (const child of root.children ?? []) {
+        if (child.id === targetId) return root;
+        const found = findParentNode(child, targetId);
+        if (found) return found;
+    }
+    return undefined;
+}
+
+/**
  * Collects text nodes within the current selection range.
- * Used by getAttributes to find mark attrs in the selected content.
+ * Returns an empty array for collapsed (caret) selections.
  */
 function collectTextNodesInSelection(state: EditorState): EditorNode[] {
     const { selection, doc } = state;
@@ -294,26 +468,64 @@ function collectTextNodes(node: EditorNode, result: EditorNode[]): void {
         result.push(node);
         return;
     }
-    if (node.children) {
-        for (const child of node.children) {
-            collectTextNodes(child, result);
-        }
+    for (const child of node.children ?? []) {
+        collectTextNodes(child, result);
     }
 }
 
-/**
- * Finds the first text node in the document tree.
- * Used as fallback when there's no selection.
- */
 function findFirstTextNode(node: EditorNode): EditorNode | undefined {
-    if (node.type === 'text') {
-        return node;
-    }
-    if (node.children) {
-        for (const child of node.children) {
-            const found = findFirstTextNode(child);
-            if (found) return found;
-        }
+    if (node.type === 'text') return node;
+    for (const child of node.children ?? []) {
+        const found = findFirstTextNode(child);
+        if (found) return found;
     }
     return undefined;
+}
+/**
+ * Returns a new EditorState with `mark` upserted into `state.storedMarks`.
+ *
+ * Used by setColor / setHighlight when selection is null or collapsed — there
+ * is no text range to apply the mark to, so we queue it in storedMarks instead.
+ * insertText consumes storedMarks and merges them onto the inserted text node
+
+ *
+ * If a mark of the same type already exists it is replaced (set marks always
+ * carry attrs, so "toggling" doesn't make sense — the new value wins).
+ * All other state fields are preserved by reference.
+ */
+function setStoredMark(
+    state: EditorState,
+    type: string,
+    attrs: Record<string, unknown>,
+): EditorState {
+    const existing = state.storedMarks ?? [];
+    const filtered = existing.filter((m) => m.type !== type);
+    return {
+        ...state,
+        storedMarks: [...filtered, { type, attrs }],
+    };
+}
+
+/**
+ * Returns a new EditorState with `type` toggled in `state.storedMarks`.
+ *
+ * Used by bold / italic / underline / strike / code when selection is collapsed
+ * — there is no text range to apply the mark to, so we queue the intent in
+ * storedMarks.  insertText consumes storedMarks and merges them onto the
+ * inserted text node 
+ *
+ * Unlike setStoredMark, toggle marks carry no meaningful attrs ({}) so the
+ * correct behaviour is on/off: if the mark is already queued, remove it;
+ * otherwise add it.  This mirrors what Cmd+B does in Word / Google Docs when
+ * the caret is placed — pressing it twice cancels the intent.
+ */
+function toggleStoredMark(state: EditorState, type: MarkType): EditorState {
+    const existing = state.storedMarks ?? [];
+    const alreadyQueued = existing.some((m) => m.type === type);
+    return {
+        ...state,
+        storedMarks: alreadyQueued
+            ? existing.filter((m) => m.type !== type)   // second press cancels
+            : [...existing, { type, attrs: {} }],        // first press arms it
+    };
 }

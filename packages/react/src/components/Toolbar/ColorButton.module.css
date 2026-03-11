@@ -42,6 +42,7 @@
    by the component (single var bridge). No inline backgroundColor on swatch.
    ──────────────────────────────────────────────────────────────────────── */
 
+/* ── Text color — underbar beneath the "A" ───────────────────────────────────*/
 .indicator {
     width: 14px;
     height: 3px;
@@ -51,22 +52,31 @@
     transition: background-color 0.15s ease;
 }
 
-/* Icon placeholder — rendered as a letter A or highlight symbol in button */
-.button[data-color-type="text"]::before {
-    content: 'A';
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--toolbar-button-color, #374151);
-    line-height: 1;
+.indicatorBar {
+    width: 100%;
+    height: 3px;
+    border-radius: 1px;
+    background-color: var(--indicator-color);
 }
 
-.button[data-color-type="highlight"]::before {
-    content: 'A';
-    font-size: 13px;
-    font-weight: 600;
-    /* Highlight icon uses a slightly different tint on the letter */
-    color: var(--toolbar-button-color, #374151);
-    line-height: 1;
+/* Hide the bar when this is a highlight button — the button bg does the job */
+.indicator[data-color-type="highlight"] {
+    display: none;
+}
+
+/* ── Highlight color — button background becomes the swatch ──────────────────
+ * The button itself is filled with the chosen color.
+ * The "A" text and its bar are still rendered but the bar is hidden above.
+ * border keeps the button visible when the chosen color is white.
+ */
+.button[data-color-type="highlight"] {
+    background-color: var(--indicator-color);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.button[data-color-type="highlight"]:hover {
+    /* Darken slightly on hover without overriding the color entirely */
+    filter: brightness(0.92);
 }
 
 /* ─── Popover ─────────────────────────────────────────────────────────── */

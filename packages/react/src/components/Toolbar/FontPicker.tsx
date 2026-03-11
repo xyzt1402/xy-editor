@@ -2,6 +2,7 @@
  * FontPicker — A dropdown for selecting font family.
  * @package @xy-editor/react
  * @module components/Toolbar
+ *
  */
 
 import React from 'react';
@@ -23,12 +24,11 @@ export const FONT_OPTIONS = [
 const DEFAULT_FONT = 'Arial';
 
 export const FontPicker: React.FC = () => {
-    const { getAttributes, commands } = useEditor();
+    // getNodeAttribute reads from block.attrs — the correct location for
+    // block-level properties like fontFamily, fontSize, and alignment.
+    const { getNodeAttribute, commands } = useEditor();
 
-    const currentFont =
-        (getAttributes('fontFamily')?.fontFamily as string | null) ?? DEFAULT_FONT;
-
-    console.log('Current font family:', getAttributes('fontFamily')); // Debug log
+    const currentFont = (getNodeAttribute('fontFamily') as string | undefined) ?? DEFAULT_FONT;
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         commands.setFontFamily(e.target.value);

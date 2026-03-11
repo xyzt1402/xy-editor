@@ -2,6 +2,7 @@
  * AlignButton — A button for text alignment options.
  * @package @xy-editor/react
  * @module components/Toolbar
+ *
  */
 
 import React from 'react';
@@ -23,10 +24,13 @@ const ALIGN_LABELS: Record<AlignValue, string> = {
 };
 
 export const AlignButton: React.FC<AlignButtonProps> = ({ align, icon }) => {
-    const { commands, getAttributes } = useEditor();
+    // getNodeAttribute reads from block.attrs — the correct location for
+    // block-level properties like fontFamily, fontSize, and alignment.
+    const { commands, getNodeAttribute } = useEditor();
 
-    // Read alignment from node attributes (no type-cast needed)
-    const currentAlignment = getAttributes('alignment')?.alignment as AlignValue | null;
+    const currentAlignment =
+        (getNodeAttribute('alignment') as AlignValue | undefined) ?? 'left';
+
     const isActive = currentAlignment === align;
 
     return (
