@@ -21,7 +21,7 @@ import styles from './Toolbar.module.css';
 
 // ─── Internal sub-components ──────────────────────────────────────────────────
 
-type MarkFormat = 'bold' | 'italic' | 'underline' | 'strike';
+type MarkFormat = 'bold' | 'italic' | 'underline' | 'strikethrough';
 
 interface FormatConfig {
     label: string;
@@ -32,7 +32,7 @@ const FORMAT_CONFIG: Record<MarkFormat, FormatConfig> = {
     bold: { label: 'Bold', shortcut: '⌘B' },
     italic: { label: 'Italic', shortcut: '⌘I' },
     underline: { label: 'Underline', shortcut: '⌘U' },
-    strike: { label: 'Strikethrough', shortcut: '⌘⇧X' },
+    strikethrough: { label: 'Strikethrough', shortcut: '⌘⇧X' },
 };
 
 type FormatButtonProps = { format: MarkFormat, icon: React.ReactNode }
@@ -45,7 +45,7 @@ const FormatButton = ({ format, icon }: FormatButtonProps) => {
         bold: () => commands.bold(),
         italic: () => commands.italic(),
         underline: () => commands.underline(),
-        strike: () => commands.strike(),
+        strikethrough: () => commands.strikethrough(),
     };
 
     return (
@@ -122,7 +122,7 @@ const DEFAULT_GROUPS: ToolbarGroup[] = [
             <FormatButton key="bold" format="bold" icon={<Bold size={16} />} />,
             <FormatButton key="italic" format="italic" icon={<Italic size={16} />} />,
             <FormatButton key="underline" format="underline" icon={<Underline size={16} />} />,
-            <FormatButton key="strike" format="strike" icon={<Strikethrough size={16} />} />,
+            <FormatButton key="strikethrough" format="strikethrough" icon={<Strikethrough size={16} />} />,
         ],
     },
     {

@@ -2,7 +2,6 @@
  * Hook to access the editor instance with commands.
  * @package @xy-editor/react
  * @module hooks/useEditor
- *
  */
 
 import { useMemo, useCallback, useRef, useEffect } from 'react';
@@ -27,7 +26,7 @@ export interface EditorCommands {
     bold: () => void;
     italic: () => void;
     underline: () => void;
-    strike: () => void;
+    strikethrough: () => void;
     code: () => void;
     setColor: (hex: string) => void;
     setHighlight: (hex: string) => void;
@@ -161,7 +160,7 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
             //   selection.isCollapsed     → caret placed, no text range selected
             //   selection is a range      → text is selected
             //
-            // For toggle marks (bold, italic, underline, strike, code):
+            // For toggle marks (bold, italic, underline, strikethrough, code):
             //   null       → no-op. There is no caret to anchor the intent to.
             //   collapsed  → toggleStoredMark: queue the mark for the next typed
             //                character.  This is the standard behaviour — pressing
@@ -209,7 +208,7 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
                 }
                 dispatch(toggleMark(current, 'underline'));
             },
-            strike: () => {
+            strikethrough: () => {
                 const current = stateRef.current;
                 if (!current.selection) return;
                 if (current.selection.isCollapsed) {
@@ -245,7 +244,7 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
             },
 
             // ── Node attribute commands ──────────────────────────────────────
-            // These target the block ancestor (SB-02 fix via makeSetNodeTransaction).
+            // These target the block ancestor.
             // No selection guard needed — makeSetNodeTransaction falls back to the
             // first text node in the doc when selection is null, so font/alignment
             // changes work even in Storybook stories without a canvas.
@@ -312,8 +311,6 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
     );
 
     // ── isActive ──────────────────────────────────────────────────────────────
-    // Delegates to core's isMarkActiveInSelection which checks storedMarks for
-    // collapsed selections and traverses the document tree for range selections.
     const isActive = useCallback(
         (markType: MarkType): boolean => isMarkActiveInSelection(state, markType),
         [state],
@@ -357,7 +354,7 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
         [state],
     );
 
-    // ── getNodeAttribute (block attrs only — SB-03 fix) ───────────────────────
+    // ── getNodeAttribute ───────────────────────
     //
     // Reads a single attribute from the BLOCK CONTAINER that holds the current
     // cursor position.  This is the correct read path for fontSize, fontFamily,
@@ -486,8 +483,7 @@ function findFirstTextNode(node: EditorNode): EditorNode | undefined {
  *
  * Used by setColor / setHighlight when selection is null or collapsed — there
  * is no text range to apply the mark to, so we queue it in storedMarks instead.
- * insertText consumes storedMarks and merges them onto the inserted text node
-
+ * insertText consumes storedMarks and merges them onto the inserted text node.
  *
  * If a mark of the same type already exists it is replaced (set marks always
  * carry attrs, so "toggling" doesn't make sense — the new value wins).
@@ -509,17 +505,17 @@ function setStoredMark(
 /**
  * Returns a new EditorState with `type` toggled in `state.storedMarks`.
  *
- * Used by bold / italic / underline / strike / code when selection is collapsed
+ * Used by bold / italic / underline / strikethrough / code when selection is collapsed
  * — there is no text range to apply the mark to, so we queue the intent in
  * storedMarks.  insertText consumes storedMarks and merges them onto the
- * inserted text node 
+ * inserted text node
  *
  * Unlike setStoredMark, toggle marks carry no meaningful attrs ({}) so the
  * correct behaviour is on/off: if the mark is already queued, remove it;
  * otherwise add it.  This mirrors what Cmd+B does in Word / Google Docs when
  * the caret is placed — pressing it twice cancels the intent.
  */
-function toggleStoredMark(state: EditorState, type: MarkType): EditorState {
+function toggleStoredMark(state: EditorState, type: string): EditorState {
     const existing = state.storedMarks ?? [];
     const alreadyQueued = existing.some((m) => m.type === type);
     return {
