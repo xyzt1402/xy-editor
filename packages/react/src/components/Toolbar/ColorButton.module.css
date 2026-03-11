@@ -11,109 +11,205 @@
 .button {
     position: relative;
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    gap: 3px;
+    width: 30px;
+    height: 30px;
     padding: 0;
-    border: 1px solid var(--color-button-border, #d1d5db);
-    border-radius: 4px;
+    border: 1px solid var(--color-button-border, #e5e7eb);
+    border-radius: 6px;
     background-color: var(--color-button-bg, #ffffff);
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition:
+        background-color 0.12s ease,
+        border-color 0.12s ease;
 }
 
 .button:hover {
     background-color: var(--color-button-hover-bg, #f3f4f6);
+    border-color: var(--color-button-hover-border, #d1d5db);
 }
 
 .button:focus-visible {
-    outline: 2px solid var(--toolbar-focus-outline-color, #3b82f6);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--toolbar-focus-ring, #6366f1);
 }
 
-/* Indicator styles based on color type */
+/* ─── Indicator bar ────────────────────────────────────────────────────────
+   Color comes from --indicator-color CSS custom property set on the element
+   by the component (single var bridge). No inline backgroundColor on swatch.
+   ──────────────────────────────────────────────────────────────────────── */
+
 .indicator {
-    width: 16px;
+    width: 14px;
     height: 3px;
-    border-radius: 1px;
+    border-radius: 2px;
+    /* The component sets --indicator-color as a CSS custom property */
+    background-color: var(--indicator-color, currentColor);
+    transition: background-color 0.15s ease;
 }
 
-.indicator[data-color-type="text"] {
-    background-color: #000000;
+/* Icon placeholder — rendered as a letter A or highlight symbol in button */
+.button[data-color-type="text"]::before {
+    content: 'A';
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--toolbar-button-color, #374151);
+    line-height: 1;
 }
 
-.indicator[data-color-type="highlight"] {
-    background-color: #fef9c3;
+.button[data-color-type="highlight"]::before {
+    content: 'A';
+    font-size: 13px;
+    font-weight: 600;
+    /* Highlight icon uses a slightly different tint on the letter */
+    color: var(--toolbar-button-color, #374151);
+    line-height: 1;
 }
 
-/* Popover */
+/* ─── Popover ─────────────────────────────────────────────────────────── */
+
 .popover {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 20;
-    padding: 8px;
+    z-index: 50;
+    padding: 10px;
     background-color: var(--popover-bg, #ffffff);
     border: 1px solid var(--popover-border-color, #e5e7eb);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+    box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.08),
+        0 10px 20px -4px rgba(0, 0, 0, 0.12);
+    /* Animate in */
+    animation: popoverIn 0.12s ease forwards;
 }
 
-/* Swatch grid - 5 columns */
+@keyframes popoverIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ─── Swatch grid ──────────────────────────────────────────────────────── */
+
 .swatchGrid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: 5px;
+    margin-bottom: 10px;
 }
 
 .swatch {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     padding: 0;
-    border: 1px solid var(--swatch-border, #d1d5db);
-    border-radius: 4px;
+    border: 1.5px solid transparent;
+    border-radius: 5px;
     cursor: pointer;
-    transition: transform 0.1s ease;
+    /* Color comes from data-color attribute via JS-set custom property */
+    background-color: attr(data-color color, #ffffff);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    /* Fallback: each swatch sets its color via data-color; we rely on 
+       the browser's attr() or the JS-applied --swatch-color approach.
+       Since attr() for non-string values has limited support,
+       we use a different approach below. */
+}
+
+/*
+  Because CSS attr() for <color> isn't universally supported, each swatch
+  renders its background via the style custom property bridge:
+  the component does NOT set style={{}} — instead it uses data-color only.
+  
+  We use a CSS paint trick: a transparent base + a pseudo that picks up 
+  the actual color from the data attribute via inline --swatch-color prop
+  that JS injects only on .swatch elements.
+
+  Since ColorButton.tsx already avoids inline styles on swatches,
+  we set the color using a dataset-driven approach in the CSS below.
+  The <button> gets `data-color="#ef4444"` and we need to bridge it.
+
+  PRACTICAL SOLUTION: We allow exactly one CSS custom property per swatch
+  via a style attribute containing only `--c: <color>`. This is the minimal
+  and accepted pattern — see FileTypeChip precedent with --chip-color.
+*/
+
+/* Override: component sets --c on the swatch button's style */
+.swatch {
+    background-color: var(--c, #e5e7eb);
 }
 
 .swatch:hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12);
+    z-index: 1;
 }
 
 .swatch:focus-visible {
-    outline: 2px solid var(--toolbar-focus-outline-color, #3b82f6);
-    outline-offset: 1px;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--toolbar-focus-ring, #6366f1);
 }
 
-/* Native color input */
+/* Selected ring */
+.swatch[data-selected] {
+    border-color: var(--toolbar-focus-ring, #6366f1);
+    box-shadow: 0 0 0 1px var(--toolbar-focus-ring, #6366f1);
+}
+
+/* White swatch needs a visible border */
+.swatch[data-color="#ffffff"],
+.swatch[data-color="#f9fafb"] {
+    border-color: #e5e7eb;
+}
+
+/* ─── Native color input ──────────────────────────────────────────────── */
+
 .nativeInputContainer {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--native-input-border, #e5e7eb);
+    padding-top: 10px;
+    border-top: 1px solid var(--native-input-border, #f3f4f6);
 }
 
 .nativeLabel {
-    font-size: 12px;
-    color: var(--native-label-color, #6b7280);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--native-label-color, #9ca3af);
+    user-select: none;
 }
 
 .nativeInput {
-    width: 32px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid var(--native-input-border, #d1d5db);
+    width: 28px;
+    height: 22px;
+    padding: 1px;
+    border: 1px solid var(--native-input-border, #e5e7eb);
     border-radius: 4px;
     cursor: pointer;
     background: none;
+    transition: border-color 0.12s ease;
+}
+
+.nativeInput:hover {
+    border-color: var(--picker-hover-border-color, #d1d5db);
+}
+
+.nativeInput:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--toolbar-focus-ring, #6366f1);
 }
 
 .nativeInput::-webkit-color-swatch-wrapper {
-    padding: 2px;
+    padding: 1px;
 }
 
 .nativeInput::-webkit-color-swatch {

@@ -8,13 +8,16 @@ import React from 'react';
 import { useEditor } from '../../hooks/useEditor';
 import styles from './SizePicker.module.css';
 
-const SIZES = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
+export const SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
+
+const DEFAULT_SIZE = 14;
 
 export const SizePicker: React.FC = () => {
     const { getAttributes, commands } = useEditor();
 
-    const currentFontSize = getAttributes('fontFamily')?.fontSize as number | null;
-    const currentSize = currentFontSize ?? 14;
+    // FIX: was incorrectly reading from 'fontFamily' key — must use 'fontSize'
+    const currentSize =
+        (getAttributes('fontSize')?.fontSize as number | null) ?? DEFAULT_SIZE;
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         commands.setFontSize(Number(e.target.value));
@@ -27,9 +30,9 @@ export const SizePicker: React.FC = () => {
             value={currentSize}
             onChange={handleChange}
         >
-            {SIZES.map((size) => (
+            {SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
-                    {size}px
+                    {size}
                 </option>
             ))}
         </select>

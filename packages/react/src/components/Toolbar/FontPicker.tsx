@@ -8,23 +8,27 @@ import React from 'react';
 import { useEditor } from '../../hooks/useEditor';
 import styles from './FontPicker.module.css';
 
-const FONTS = [
-    'Arial',
-    'Georgia',
-    'Times New Roman',
-    'Courier New',
-    'Verdana',
-    'Trebuchet MS',
-    'IBM Plex Sans',
-    'IBM Plex Serif',
-    'IBM Plex Mono',
+export const FONT_OPTIONS = [
+    { label: 'Arial', value: 'Arial' },
+    { label: 'Georgia', value: 'Georgia' },
+    { label: 'Times New Roman', value: 'Times New Roman' },
+    { label: 'Courier New', value: 'Courier New' },
+    { label: 'Verdana', value: 'Verdana' },
+    { label: 'Trebuchet MS', value: 'Trebuchet MS' },
+    { label: 'IBM Plex Sans', value: 'IBM Plex Sans' },
+    { label: 'IBM Plex Serif', value: 'IBM Plex Serif' },
+    { label: 'IBM Plex Mono', value: 'IBM Plex Mono' },
 ] as const;
+
+const DEFAULT_FONT = 'Arial';
 
 export const FontPicker: React.FC = () => {
     const { getAttributes, commands } = useEditor();
 
-    const currentFontFamily = getAttributes('fontFamily')?.fontFamily as string | null;
-    const currentFont = currentFontFamily ?? 'Arial';
+    const currentFont =
+        (getAttributes('fontFamily')?.fontFamily as string | null) ?? DEFAULT_FONT;
+
+    console.log('Current font family:', getAttributes('fontFamily')); // Debug log
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         commands.setFontFamily(e.target.value);
@@ -37,9 +41,9 @@ export const FontPicker: React.FC = () => {
             value={currentFont}
             onChange={handleChange}
         >
-            {FONTS.map((font) => (
-                <option key={font} value={font} data-font={font}>
-                    {font}
+            {FONT_OPTIONS.map(({ label, value }) => (
+                <option key={value} value={value} data-font={value}>
+                    {label}
                 </option>
             ))}
         </select>

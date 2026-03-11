@@ -7,6 +7,10 @@
 import React from 'react';
 import styles from './ToolbarDivider.module.css';
 
-export const ToolbarDivider: React.FC = () => {
-    return <div className={styles.divider} role="separator" aria-orientation="vertical" />;
-};
+export const ToolbarDivider: React.FC = () => (
+    <div
+        className={styles.divider}
+        role="separator"
+        aria-orientation="vertical"
+    />
+);

@@ -7,24 +7,29 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px;
+    gap: 2px;
+    padding: 5px 8px;
     background-color: var(--toolbar-bg, #ffffff);
     border-bottom: 1px solid var(--toolbar-border, #e5e7eb);
     position: sticky;
     top: 0;
-    z-index: 5;
+    z-index: 10;
+    /* Subtle shadow to elevate toolbar above content when scrolling */
+    box-shadow: 0 1px 0 0 var(--toolbar-border, #e5e7eb);
+    min-height: 42px;
 }
 
 .group {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
 }
 
+/* Trailing slot for custom children */
 .custom {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-left: auto;
+    padding-left: 8px;
 }

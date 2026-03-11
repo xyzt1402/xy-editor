@@ -14,7 +14,7 @@ import {
     redo as coreRedo,
 } from '@xy-editor/core';
 import { generateId } from '@xy-editor/core';
-import type { MarkType, EditorNode, EditorState, Transaction } from '@xy-editor/core';
+import type { MarkType, EditorNode, EditorState, Transaction, SelectionPoint } from '@xy-editor/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,22 +92,39 @@ export function useEditor(_config?: EditorConfig): EditorInstance {
     /**
      * Builds a setNode transaction targeting the current selection.
      * Used for font size, font family, and alignment commands.
+     *
+     * When no selection exists, falls back to the first text node in the document.
      */
     const makeSetNodeTransaction = useCallback(
         (data: Record<string, unknown>): Transaction => {
             const current = stateRef.current;
+
+            // Find a default position if no selection exists
+            let position: { anchor: SelectionPoint; focus: SelectionPoint } | undefined;
+
+            if (current.selection) {
+                position = {
+                    anchor: current.selection.anchor,
+                    focus: current.selection.focus,
+                };
+            } else if (current.doc.children?.length) {
+                // Fallback: use the first text node in the document
+                const firstTextNode = findFirstTextNode(current.doc);
+                if (firstTextNode) {
+                    position = {
+                        anchor: { nodeId: firstTextNode.id, offset: 0 },
+                        focus: { nodeId: firstTextNode.id, offset: 0 },
+                    };
+                }
+            }
+
             return {
                 id: generateId(),
                 steps: [
                     {
                         type: 'setNode',
                         data,
-                        position: current.selection
-                            ? {
-                                anchor: current.selection.anchor,
-                                focus: current.selection.focus,
-                            }
-                            : undefined,
+                        position,
                     },
                 ],
             };
@@ -282,4 +299,21 @@ function collectTextNodes(node: EditorNode, result: EditorNode[]): void {
             collectTextNodes(child, result);
         }
     }
+}
+
+/**
+ * Finds the first text node in the document tree.
+ * Used as fallback when there's no selection.
+ */
+function findFirstTextNode(node: EditorNode): EditorNode | undefined {
+    if (node.type === 'text') {
+        return node;
+    }
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findFirstTextNode(child);
+            if (found) return found;
+        }
+    }
+    return undefined;
 }

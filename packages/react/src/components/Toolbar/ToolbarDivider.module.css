@@ -5,8 +5,8 @@
 
 .divider {
     width: 1px;
-    height: 20px;
+    height: 18px;
     background-color: var(--toolbar-divider-color, #e5e7eb);
-    margin: 0 8px;
+    margin: 0 4px;
     flex-shrink: 0;
 }

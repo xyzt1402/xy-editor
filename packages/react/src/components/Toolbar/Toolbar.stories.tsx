@@ -1,9 +1,11 @@
 /**
- * Stories for Toolbar component.
+ * Stories for Toolbar components.
  * @package @xy-editor/react
  */
 
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react';
 import { EditorProvider } from '../../context/EditorContext';
 import { createEmptyState } from '@xy-editor/core';
 import { Toolbar } from './Toolbar';
@@ -13,20 +15,13 @@ import { FontPicker } from './FontPicker';
 import { SizePicker } from './SizePicker';
 import { ColorButton } from './ColorButton';
 import { AlignButton } from './AlignButton';
-import {
-    Bold,
-    Italic,
-    AlignLeft,
-    AlignCenter,
-    AlignRight,
-    AlignJustify,
-} from 'lucide-react';
 import styles from './Toolbar.stories.module.css';
 
-// Wrapper to provide EditorContext
-const EditorWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+// ─── Decorator ────────────────────────────────────────────────────────────────
+
+const withEditor = (Story: () => React.JSX.Element) => (
     <EditorProvider defaultValue={createEmptyState()}>
-        {children}
+        <Story />
     </EditorProvider>
 );
 
@@ -34,152 +29,126 @@ const EditorWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 const meta = {
     title: 'Components/Toolbar',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    component: Toolbar as any,
-    decorators: [
-        (Story: () => React.JSX.Element) => (
-            <EditorWrapper>
-                <Story />
-            </EditorWrapper>
-        ),
-    ],
-} satisfies Meta;
+    component: Toolbar,
+    decorators: [withEditor],
+    parameters: {
+        layout: 'fullscreen',
+    },
+} satisfies Meta<typeof Toolbar>;
 
 export default meta;
+type Story = StoryObj<typeof meta>;
 
-// ─── Stories ────────────────────────────────────────────────────────────────
+// ─── Toolbar stories ──────────────────────────────────────────────────────────
 
-export const Default: StoryObj = {};
+export const Default: Story = {};
 
-export const WithCustomClassName: StoryObj = {
-    name: 'With Custom ClassName',
+export const WithCustomClassName: Story = {
+    name: 'Custom className',
     render: () => (
-        <EditorWrapper>
+        <EditorProvider defaultValue={createEmptyState()}>
             <Toolbar className={styles.customToolbar} />
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-export const WithCustomChildren: StoryObj = {
-    name: 'With Custom Children',
+export const WithCustomChildren: Story = {
+    name: 'Custom trailing children',
     render: () => (
-        <EditorWrapper>
+        <EditorProvider defaultValue={createEmptyState()}>
             <Toolbar>
                 <ToolbarButton
-                    icon={<span>🔗</span>}
-                    label="Insert Link"
+                    icon={<span aria-hidden="true">🔗</span>}
+                    label="Insert link"
                     onClick={() => { }}
                 />
             </Toolbar>
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-export const Empty: StoryObj = {
-    name: 'Empty Toolbar',
+export const EmptyToolbar: Story = {
+    name: 'Empty (groups=[])',
     render: () => (
-        <EditorWrapper>
+        <EditorProvider defaultValue={createEmptyState()}>
             <Toolbar groups={[]} />
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-// ─── Subcomponent Stories ─────────────────────────────────────────────────
+// ─── Sub-component stories ────────────────────────────────────────────────────
 
-export const ToolbarButtonStories: StoryObj = {
-    name: 'ToolbarButton Variants',
+export const ToolbarButtonVariants: Story = {
+    name: 'ToolbarButton — variants',
     render: () => (
-        <EditorWrapper>
-            <div style={{ display: 'flex', gap: '8px' }}>
-                <ToolbarButton
-                    icon={<Bold size={18} />}
-                    label="Bold"
-                    onClick={() => { }}
-                />
-                <ToolbarButton
-                    icon={<Bold size={18} />}
-                    label="Bold Active"
-                    onClick={() => { }}
-                    active
-                />
-                <ToolbarButton
-                    icon={<Bold size={18} />}
-                    label="Bold Disabled"
-                    onClick={() => { }}
-                    disabled
-                />
-                <ToolbarButton
-                    icon={<Bold size={18} />}
-                    label="Bold"
-                    onClick={() => { }}
-                    shortcut="⌘B"
-                />
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
+                <ToolbarButton icon={<Bold size={16} />} label="Bold" onClick={() => { }} />
+                <ToolbarButton icon={<Bold size={16} />} label="Bold active" onClick={() => { }} active />
+                <ToolbarButton icon={<Bold size={16} />} label="Bold disabled" onClick={() => { }} disabled />
+                <ToolbarButton icon={<Bold size={16} />} label="Bold" onClick={() => { }} shortcut="⌘B" />
             </div>
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-export const FontPickerStory: StoryObj = {
+export const FontPickerStory: Story = {
     name: 'FontPicker',
     render: () => (
-        <EditorWrapper>
-            <FontPicker />
-        </EditorWrapper>
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
+                <FontPicker />
+            </div>
+        </EditorProvider>
     ),
 };
 
-export const SizePickerStory: StoryObj = {
+export const SizePickerStory: Story = {
     name: 'SizePicker',
     render: () => (
-        <EditorWrapper>
-            <SizePicker />
-        </EditorWrapper>
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
+                <SizePicker />
+            </div>
+        </EditorProvider>
     ),
 };
 
-export const ColorButtonStories: StoryObj = {
-    name: 'ColorButton Variants',
+export const ColorButtonVariants: Story = {
+    name: 'ColorButton — text & highlight',
     render: () => (
-        <EditorWrapper>
-            <div style={{ display: 'flex', gap: '8px' }}>
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
                 <ColorButton type="text" />
                 <ColorButton type="highlight" />
             </div>
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-export const AlignButtonStories: StoryObj = {
-    name: 'AlignButton Variants',
+export const AlignButtonVariants: Story = {
+    name: 'AlignButton — all alignments',
     render: () => (
-        <EditorWrapper>
-            <div style={{ display: 'flex', gap: '4px' }}>
-                <AlignButton align="left" icon={<AlignLeft size={18} />} />
-                <AlignButton align="center" icon={<AlignCenter size={18} />} />
-                <AlignButton align="right" icon={<AlignRight size={18} />} />
-                <AlignButton align="justify" icon={<AlignJustify size={18} />} />
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
+                <AlignButton align="left" icon={<AlignLeft size={16} />} />
+                <AlignButton align="center" icon={<AlignCenter size={16} />} />
+                <AlignButton align="right" icon={<AlignRight size={16} />} />
+                <AlignButton align="justify" icon={<AlignJustify size={16} />} />
             </div>
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };
 
-export const DividerStory: StoryObj = {
+export const DividerStory: Story = {
     name: 'ToolbarDivider',
     render: () => (
-        <EditorWrapper>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ToolbarButton
-                    icon={<Bold size={18} />}
-                    label="Bold"
-                    onClick={() => { }}
-                />
+        <EditorProvider defaultValue={createEmptyState()}>
+            <div className={styles.row}>
+                <ToolbarButton icon={<Bold size={16} />} label="Bold" onClick={() => { }} />
                 <ToolbarDivider />
-                <ToolbarButton
-                    icon={<Italic size={18} />}
-                    label="Italic"
-                    onClick={() => { }}
-                />
+                <ToolbarButton icon={<Italic size={16} />} label="Italic" onClick={() => { }} />
             </div>
-        </EditorWrapper>
+        </EditorProvider>
     ),
 };

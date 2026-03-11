@@ -5,13 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { renderWithEditor } from '../../../test/utils';
-import { SizePicker } from '../index';
+import { SizePicker, SIZE_OPTIONS } from '../index';
 
 describe('SizePicker', () => {
-    const sizes = [10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
-
     it('renders a <select> with aria-label="Font size"', () => {
         renderWithEditor(<SizePicker />);
 
@@ -20,26 +18,34 @@ describe('SizePicker', () => {
         expect(select.tagName).toBe('SELECT');
     });
 
-    it('renders all 13 size options', () => {
+    it(`renders all ${SIZE_OPTIONS.length} size options`, () => {
+        renderWithEditor(<SizePicker />);
+
+        const options = screen.getByLabelText('Font size').querySelectorAll('option');
+        expect(options.length).toBe(SIZE_OPTIONS.length);
+    });
+
+    it('renders options matching SIZE_OPTIONS values', () => {
         renderWithEditor(<SizePicker />);
 
         const select = screen.getByLabelText('Font size');
-        const options = select.querySelectorAll('option');
-
-        expect(options.length).toBe(13);
-    });
-
-    it('displays current size from editor.getAttributes("fontSize")', () => {
-        // Test fallback behavior
-        renderWithEditor(<SizePicker />);
-
-        const select = screen.getByLabelText('Font size') as HTMLSelectElement;
-
-        // Default should be 14 (the fallback)
-        expect(select.value).toBe('14');
+        SIZE_OPTIONS.forEach((size) => {
+            const option = select.querySelector(`option[value="${size}"]`);
+            expect(option).toBeInTheDocument();
+            expect(option?.textContent).toBe(String(size));
+        });
     });
 
     it('falls back to 14 when getAttributes returns null', () => {
+        renderWithEditor(<SizePicker />);
+
+        const select = screen.getByLabelText('Font size') as HTMLSelectElement;
+        expect(select.value).toBe('14');
+    });
+
+    it('reads from getAttributes("fontSize"), not "fontFamily"', () => {
+        // Regression: previous version used getAttributes('fontFamily')?.fontSize — wrong key
+        // This test ensures the default (14) is rendered, confirming correct attribute lookup
         renderWithEditor(<SizePicker />);
 
         const select = screen.getByLabelText('Font size') as HTMLSelectElement;
@@ -50,11 +56,8 @@ describe('SizePicker', () => {
         renderWithEditor(<SizePicker />);
 
         const select = screen.getByLabelText('Font size');
-
-        // Change to 16
         fireEvent.change(select, { target: { value: '16' } });
 
-        // Verify the select works correctly
         expect((select as HTMLSelectElement).value).toBe('16');
     });
 });

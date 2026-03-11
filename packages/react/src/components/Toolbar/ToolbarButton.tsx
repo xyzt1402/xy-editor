@@ -16,12 +16,6 @@ export interface ToolbarButtonProps {
     shortcut?: string;
 }
 
-/**
- * Renders a toolbar button with CSS-only tooltip support.
- * - data-active attribute when pressed/tinted
- * - data-disabled attribute when disabled
- * - CSS-only tooltip showing label + shortcut on hover/focus-visible
- */
 export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     icon,
     label,
@@ -30,23 +24,24 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     disabled = false,
     shortcut,
 }) => {
-    const buttonProps = {
-        type: 'button' as const,
-        className: styles.button,
-        'aria-label': label,
-        'aria-pressed': active,
-        'data-active': active || undefined,
-        'data-disabled': disabled || undefined,
-        onClick: disabled ? undefined : onClick,
-        disabled: disabled,
-    };
-
     const tooltipContent = shortcut ? `${label} ${shortcut}` : label;
 
     return (
-        <button {...buttonProps}>
-            <span className={styles.icon}>{icon}</span>
-            <span className={styles.tooltip} data-tooltip={tooltipContent}>
+        <button
+            type="button"
+            className={styles.button}
+            aria-label={label}
+            aria-pressed={active}
+            data-active={active || undefined}
+            data-disabled={disabled || undefined}
+            onClick={disabled ? undefined : onClick}
+            disabled={disabled}
+        >
+            <span className={styles.icon} aria-hidden="true">
+                {icon}
+            </span>
+            {/* CSS-only tooltip — hidden via opacity/visibility, never read by screen readers */}
+            <span className={styles.tooltip} aria-hidden="true">
                 {tooltipContent}
             </span>
         </button>

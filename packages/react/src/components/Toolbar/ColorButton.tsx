@@ -4,7 +4,7 @@
  * @module components/Toolbar
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditor } from '../../hooks/useEditor';
 import styles from './ColorButton.module.css';
 
@@ -13,81 +13,77 @@ export interface ColorButtonProps {
 }
 
 const PRESET_COLORS = [
-    '#000000',
-    '#ffffff',
-    '#ef4444',
-    '#f97316',
-    '#eab308',
-    '#22c55e',
-    '#3b82f6',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#374151',
-    '#6b7280',
-    '#fee2e2',
-    '#fef9c3',
-    '#dcfce7',
-    '#dbeafe',
-    '#ede9fe',
-    '#fce7f3',
-    '#f1f5f9',
-    '#1e293b',
+    '#000000', '#374151', '#6b7280', '#9ca3af', '#ffffff',
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
+    '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
+    '#fee2e2', '#fef9c3', '#dcfce7', '#dbeafe', '#ede9fe',
 ] as const;
+
+const DEFAULTS: Record<ColorButtonProps['type'], string> = {
+    text: '#000000',
+    highlight: '#fef08a',
+};
 
 export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [currentColor, setCurrentColor] = useState(DEFAULTS[type]);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
-    const { commands } = useEditor();
+    const { commands, getAttributes } = useEditor();
 
     const label = type === 'text' ? 'Text color' : 'Highlight color';
 
-    // Close popover on Escape key
+    // Sync current color from editor state
+    const attrKey = type === 'text' ? 'color' : 'highlight';
+    const editorColor = getAttributes(attrKey)?.[attrKey] as string | null;
+    const indicatorColor = editorColor ?? DEFAULTS[type];
+
+    // Close on Escape
     useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
                 setIsOpen(false);
+                buttonRef.current?.focus();
             }
         };
-
-        if (isOpen) {
-            document.addEventListener('keydown', handleEscape);
-            return () => document.removeEventListener('keydown', handleEscape);
-        }
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isOpen]);
 
-    // Close popover on click outside
+    // Close on click outside
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        if (!isOpen) return;
+        const handleMouseDown = (e: MouseEvent) => {
             if (
-                isOpen &&
-                buttonRef.current &&
-                popoverRef.current &&
-                !buttonRef.current.contains(e.target as Node) &&
-                !popoverRef.current.contains(e.target as Node)
+                !buttonRef.current?.contains(e.target as Node) &&
+                !popoverRef.current?.contains(e.target as Node)
             ) {
                 setIsOpen(false);
             }
         };
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
+        document.addEventListener('mousedown', handleMouseDown);
+        return () => document.removeEventListener('mousedown', handleMouseDown);
     }, [isOpen]);
 
-    const handleColorSelect = (color: string) => {
+    const applyColor = useCallback((color: string) => {
+        setCurrentColor(color);
         if (type === 'text') {
             commands.setColor(color);
         } else {
             commands.setHighlight(color);
         }
         setIsOpen(false);
-    };
+    }, [type, commands]);
 
-    const handleNativeColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        handleColorSelect(e.target.value);
+    const handleNativeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Update live as user picks — don't close until they commit
+        setCurrentColor(e.target.value);
+        if (type === 'text') {
+            commands.setColor(e.target.value);
+        } else {
+            commands.setHighlight(e.target.value);
+        }
     };
 
     return (
@@ -99,10 +95,15 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
                 aria-label={label}
                 aria-expanded={isOpen}
                 aria-haspopup="listbox"
-                onClick={() => setIsOpen(!isOpen)}
                 data-color-type={type}
+                onClick={() => setIsOpen((v) => !v)}
             >
-                <span className={styles.indicator} data-color-type={type} />
+                {/* Indicator bar — colour set via CSS custom property, no inline style */}
+                <span
+                    className={styles.indicator}
+                    data-color-type={type}
+                    style={{ '--indicator-color': indicatorColor } as React.CSSProperties}
+                />
             </button>
 
             {isOpen && (
@@ -117,22 +118,30 @@ export const ColorButton: React.FC<ColorButtonProps> = ({ type }) => {
                             <button
                                 key={color}
                                 type="button"
-                                className={styles.swatch}
-                                style={{ backgroundColor: color }}
-                                data-color={color}
-                                onClick={() => handleColorSelect(color)}
-                                aria-label={`Select color ${color}`}
                                 role="option"
+                                className={styles.swatch}
+                                data-color={color}
+                                data-selected={indicatorColor === color || undefined}
+                                aria-label={`Select color ${color}`}
+                                aria-selected={indicatorColor === color}
+                                onClick={() => applyColor(color)}
+                                // Single CSS custom property — minimal, accepted pattern
+                                // (same approach as FileTypeChip --chip-color)
+                                style={{ '--c': color } as React.CSSProperties}
                             />
                         ))}
                     </div>
+
                     <div className={styles.nativeInputContainer}>
-                        <label className={styles.nativeLabel}>Custom</label>
+                        <label htmlFor={`color-input-${type}`} className={styles.nativeLabel}>
+                            Custom
+                        </label>
                         <input
+                            id={`color-input-${type}`}
                             type="color"
                             className={styles.nativeInput}
-                            value={type === 'text' ? '#000000' : '#ffff00'}
-                            onChange={handleNativeColorChange}
+                            value={currentColor}
+                            onChange={handleNativeChange}
                             aria-label="Custom color"
                         />
                     </div>

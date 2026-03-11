@@ -4,8 +4,8 @@
  * @module converters/rawToEditorState
  */
 
-import { createEmptyState, generateNodeId } from '@xy-editor/core';
-import type { EditorState, EditorNode } from '@xy-editor/core';
+import { createEmptyState, generateId } from '@xy-editor/core';
+import type { EditorState, EditorNode, Selection } from '@xy-editor/core';
 import type { RawContent, RawBlock } from '../types';
 
 /**
@@ -13,7 +13,7 @@ import type { RawContent, RawBlock } from '../types';
  */
 function blockToNode(block: RawBlock): EditorNode {
     const node: EditorNode = {
-        id: generateNodeId(),
+        id: generateId(),
         type: block.type,
         attrs: block.data || {},
     };
@@ -58,6 +58,37 @@ function blockToNode(block: RawBlock): EditorNode {
 }
 
 /**
+ * Finds the first text node in the document tree.
+ */
+function findFirstTextNode(node: EditorNode): EditorNode | undefined {
+    if (node.type === 'text') {
+        return node;
+    }
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findFirstTextNode(child);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Creates a default selection pointing to the first text node in the document.
+ * This ensures the editor has a valid selection after file ingestion.
+ */
+function createDefaultSelection(doc: EditorNode): Selection | null {
+    const firstTextNode = findFirstTextNode(doc);
+    if (!firstTextNode) return null;
+
+    return {
+        anchor: { nodeId: firstTextNode.id, offset: 0 },
+        focus: { nodeId: firstTextNode.id, offset: 0 },
+        isCollapsed: true,
+    };
+}
+
+/**
  * Converts RawContent to EditorState.
  * 
  * Uses createEmptyState as a base and replaces the document content
@@ -81,7 +112,7 @@ export function convertToEditorState(raw: RawContent): EditorState {
 
     // Create the new document node
     const docNode: EditorNode = {
-        id: generateNodeId(),
+        id: generateId(),
         type: 'doc',
         children,
         attrs: {
@@ -90,10 +121,11 @@ export function convertToEditorState(raw: RawContent): EditorState {
         },
     };
 
-    // Return the new state
+    // Return the new state with a default selection
     return {
         ...baseState,
         doc: docNode,
+        selection: createDefaultSelection(docNode),
         meta: {
             ...baseState.meta,
             ...raw.meta,
