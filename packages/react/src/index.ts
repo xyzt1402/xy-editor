@@ -15,6 +15,11 @@ export { useHistory } from './hooks/useHistory';
 export { useEditor } from './hooks/useEditor';
 export { useFileIngest } from './hooks/useFileIngest';
 
+// Components - Editor
+export { Editor, EditorContent, UncontrolledEditor } from './components/Editor';
+export type { EditorProps, EditorContentProps, EditorHandle, UncontrolledEditorProps } from './components/Editor';
+export { renderNode, marksToStyle } from './components/Editor';
+
 // Components - DropZone
 export { DropZone } from './components/DropZone';
 export type { DropZoneProps } from './components/DropZone';

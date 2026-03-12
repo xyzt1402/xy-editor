@@ -1,0 +1,160 @@
+import { Canvas } from '@storybook/addon-docs/blocks';
+import * as EditorStories from './Editor.stories';
+
+# Editor
+
+The Editor is the core contenteditable rendering layer for xy-editor. It bridges the immutable `EditorState` from `@xy-editor/core` with the browser's DOM, providing a reactive editing experience where React is always the source of truth.
+
+## Architecture
+
+```
+User keystroke
+    ↓
+beforeinput (prevented from hitting DOM)
+    ↓
+commands.* / dispatch(Transaction)
+    ↓
+EditorState (immutable update)
+    ↓
+React re-render → renderNode → DOM
+    ↓
+selectionchange → EditorState.selection sync
+```
+
+The editor uses a declarative rendering approach where:
+- `EditorState` is the single source of truth
+- All mutations go through `dispatch(Transaction)`
+- DOM is never read back as content
+- Selection sync is debounced (16ms) to avoid thrashing
+
+## Controlled vs Uncontrolled
+
+The Editor supports both controlled and uncontrolled modes, similar to React's controlled inputs.
+
+### Controlled Mode
+
+In controlled mode, the parent component owns the state entirely:
+
+```tsx
+const [state, setState] = useState(createEmptyState());
+
+<Editor
+  value={state}
+  onChange={setState}
+/>
+```
+
+### Uncontrolled Mode
+
+In uncontrolled mode, the editor manages its own state internally:
+
+```tsx
+<Editor
+  defaultValue={initialState}
+  onChange={(state) => console.log(state)}
+/>
+```
+
+## Stories
+
+<Canvas of={EditorStories.Default} />
+
+Empty editor — placeholder visible, type to create content.
+
+<Canvas of={EditorStories.WithContent} />
+
+Pre-loaded state with paragraphs and headings.
+
+<Canvas of={EditorStories.ReadOnly} />
+
+readOnly=true — no caret, toolbar hidden.
+
+<Canvas of={EditorStories.AllMarkTypes} />
+
+One line per mark type to verify visual rendering.
+
+<Canvas of={EditorStories.ControlledWithExternalState} />
+
+Parent component drives state — button outside editor appends a paragraph.
+
+<Canvas of={EditorStories.PasteSimulation} />
+
+"Simulate Paste" button fires a programmatic paste with HTML content.
+
+<Canvas of={EditorStories.TableExample} />
+
+Table rendered as CSS Grid divs — no `<table>` element.
+
+<Canvas of={EditorStories.DropZone} />
+
+dropZone=true — drag a `.txt` or `.docx` file onto the editor.
+
+<Canvas of={EditorStories.LongDocument} />
+
+50-paragraph document — scroll performance baseline.
+
+<Canvas of={EditorStories.AutoFocus} />
+
+autoFocus=true — caret visible immediately on mount.
+
+## Table Rendering
+
+We avoid native HTML tables (`<table>`, `<tr>`, `<td>`) inside `contenteditable` because they cause caret jumping, selection issues, and unpredictable copy-paste behavior across browsers.
+
+Instead, we use CSS Grid:
+
+```tsx
+<div role="table" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+  <div role="row" style={{ display: 'contents' }}>
+    <div role="cell">Cell 1</div>
+    <div role="cell">Cell 2</div>
+    <div role="cell">Cell 3</div>
+  </div>
+</div>
+```
+
+The `table` div uses `display: grid` with `grid-template-columns` derived from `node.attrs.columns`. The `table-row` uses `display: contents` so its children flow directly into the parent grid.
+
+## Event Flow
+
+1. **beforeinput** - The primary input event. We call `event.preventDefault()` for all handled types so the browser doesn't mutate the DOM directly. Instead, we dispatch a Transaction that updates EditorState.
+
+2. **selectionchange** - Debounced at 16ms to avoid excessive updates. Converts DOM selection points to EditorState selection points.
+
+3. **keydown** - Handles keyboard shortcuts (Mod+B for bold, Mod+I for italic, etc.). Plugin keymaps are checked first.
+
+4. **paste** - HTML is cleaned using an allowlist before insertion. Falls back to plain text.
+
+5. **drop** - Files are ingested via `useFileIngest`, plain text via `insertText`.
+
+## Placeholder
+
+The placeholder uses CSS's `::before` pseudo-element on `[data-editor-root]:empty`:
+
+```css
+[data-editor-root]:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+```
+
+No extra DOM element is needed for the placeholder.
+
+## Adding a Plugin
+
+Plugins can add custom keymap handlers:
+
+```tsx
+const myPlugin = {
+  name: 'my-plugin',
+  keymap: {
+    'Escape': (state, dispatch) => {
+      // Handle Escape key
+      return true; // handled
+    },
+  },
+};
+
+<Editor plugins={[myPlugin]} />
+```

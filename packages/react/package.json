@@ -17,6 +17,7 @@
         "dist"
     ],
     "scripts": {
+        "build": "tsup",
         "test": "vitest --project unit",
         "test:storybook": "vitest --project storybook",
         "test:all": "vitest",
